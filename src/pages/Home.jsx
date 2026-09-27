@@ -2,56 +2,106 @@ import carwashHero from '../assets/carwash-hero.jpg'
 
 function Home() {
   return (
-    <div className="pt-24">
+    <div>
 
+      {/* HERO / HOME */}
       <section
-        className="relative bg-cover bg-center min-h-[70vh] flex items-center px-6"
+        className="relative min-h-screen bg-cover bg-center flex items-center px-6 md:px-16"
         style={{ backgroundImage: `url(${carwashHero})` }}
       >
-        <div className="absolute inset-0 bg-black/30"></div>
 
-        <div className="relative z-10 max-w-xl text-left">
-          <h1 className="text-4xl font-bold text-white mb-4">
-            Welcome to Express Car Wash
-          </h1>
-          <p className="text-gray-100 text-lg mb-6">
-            We take care of your vehicle with fast, reliable, and affordable
-            washing and detailing — whether it's a motorcycle, car, or truck.
-            Drive in, relax, and let us handle the rest.
+        
+        <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/55 to-transparent"></div>
+
+        {/* Hero Content */}
+        <div className="relative z-10 max-w-2xl text-left pt-16">
+
+          <p className="text-gray-300 uppercase tracking-widest text-sm mb-3">
+            Fast. Clean. Reliable.
           </p>
-          <button className="bg-gray-100 text-gray-900 px-6 py-3 rounded font-semibold">
+
+          <h1 className="text-5xl md:text-6xl font-bold text-white mb-6">
+            Welcome to
+            <span className="block text-blue-500">
+              Express Car Wash
+            </span>
+          </h1>
+
+          <p className="text-gray-200 text-lg md:text-xl leading-relaxed mb-8 max-w-xl">
+            We take care of your vehicle with fast, reliable, and affordable
+            washing and detailing. Whether it's a motorcycle, car, or truck,
+            drive in, relax, and let us handle the rest.
+          </p>
+
+          <button className="ml-auto bg-blue-600 text-white px-6 py-3 rounded-md font-semibold font-[Montserrat] hover:bg-blue-800 transition duration-300">
             Book Now
           </button>
+
         </div>
       </section>
 
-      <section className="py-12 px-6 bg-gray-50">
-        <h2 className="text-xl font-bold text-center mb-8 text-gray-800">
+
+      {/* SERVICES */}
+      <section
+        id="services"
+        className="py-20 px-6 md:px-16 bg-gray-50"
+      >
+
+        <h2 className="text-3xl font-bold text-center mb-4 text-gray-800">
           Our Services
         </h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
 
-          <div className="bg-white shadow rounded p-6 text-center border border-gray-200">
-            <h3 className="font-bold mb-2 text-gray-800">Exterior Wash</h3>
-            <p className="text-sm text-gray-600">Motorcycles, cars & trucks</p>
+        <p className="text-center text-gray-500 mb-12">
+          Professional care for every type of vehicle
+        </p>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+
+          <div className="bg-white shadow-md rounded-lg p-8 text-center border border-gray-200">
+            <h3 className="font-bold text-xl mb-3 text-gray-800">
+              Exterior Wash
+            </h3>
+
+            <p className="text-gray-600">
+              Motorcycles, cars & trucks
+            </p>
           </div>
 
-          <div className="bg-white shadow rounded p-6 text-center border border-gray-200">
-            <h3 className="font-bold mb-2 text-gray-800">Interior Detailing</h3>
-            <p className="text-sm text-gray-600">Cars & trucks</p>
+
+          <div className="bg-white shadow-md rounded-lg p-8 text-center border border-gray-200">
+            <h3 className="font-bold text-xl mb-3 text-gray-800">
+              Interior Detailing
+            </h3>
+
+            <p className="text-gray-600">
+              Deep cleaning for cars & trucks
+            </p>
           </div>
 
-          <div className="bg-white shadow rounded p-6 text-center border border-gray-200">
-            <h3 className="font-bold mb-2 text-gray-800">Waxing</h3>
-            <p className="text-sm text-gray-600">Leave it shining</p>
+
+          <div className="bg-white shadow-md rounded-lg p-8 text-center border border-gray-200">
+            <h3 className="font-bold text-xl mb-3 text-gray-800">
+              Waxing
+            </h3>
+
+            <p className="text-gray-600">
+              Give your vehicle that fresh shine
+            </p>
           </div>
 
         </div>
       </section>
 
-      <footer className="bg-gray-900 text-center py-6 px-6 text-sm text-gray-400">
-        <p>Express Car Wash</p>
-        <p>Homaba, Kanyadhiang', near RA</p>
+
+      {/* FOOTER */}
+      <footer className="bg-gray-900 text-center py-8 px-6 text-sm text-gray-400">
+        <p className="text-white font-semibold mb-2">
+          Express Car Wash
+        </p>
+
+        <p>
+          Homabay, Kanyadhiang'
+        </p>
       </footer>
 
     </div>
