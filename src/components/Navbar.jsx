@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom'
 function Navbar() {
   return (
     <nav className="absolute top-0 left-0 w-full z-50 flex items-center px-10 py-6">
-
       {/* Logo */}
       <Link
         to="/"

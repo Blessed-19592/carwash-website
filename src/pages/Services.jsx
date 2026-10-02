@@ -1,20 +1,22 @@
+import { CarFront, Sparkles, Gem } from "lucide-react";
+
 function Services() {
   return (
     <div>
 
       {/* SERVICES HERO */}
-      <section className="bg-gray-900 text-white py-32 px-6 md:px-16">
+      <section className="bg-white py-24 px-6 md:px-16">
         <div className="max-w-6xl mx-auto text-center">
 
           <p className="text-blue-400 uppercase tracking-widest text-sm font-semibold mb-3">
             What We Offer
           </p>
 
-          <h1 className="text-4xl md:text-6xl font-bold mb-6">
+          <h1 className="text-4xl md:text-6xl font-bold text-gray-900 mb-6">
             Our Services
           </h1>
 
-          <p className="text-gray-300 text-lg max-w-2xl mx-auto">
+          <p className="text-gray-600 text-lg max-w-2xl mx-auto">
             Professional cleaning and detailing services designed to
             keep your vehicle looking and feeling its best.
           </p>
@@ -51,11 +53,10 @@ function Services() {
 
 
             {/* BASIC WASH */}
-            <div className="border border-gray-200 rounded-2xl p-8 hover:shadow-xl transition duration-300">
-
+            <div className="border border-gray-200 hover:border-blue-600 shadow-xl rounded-2xl p-8 transition duration-300">
               <div className="w-14 h-14 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center mb-6">
-                <span className="text-2xl">🚗</span>
-              </div>
+  <CarFront size={28} />
+</div>
 
               <h3 className="text-2xl font-bold text-gray-900 mb-3">
                 Basic Wash
@@ -81,11 +82,11 @@ function Services() {
 
 
             {/* FULL WASH */}
-            <div className="border border-gray-200 rounded-2xl p-8 hover:shadow-xl transition duration-300">
+            <div className="border border-gray-200 hover:border-blue-600 shadow-xl rounded-2xl p-8 transition duration-300">
 
               <div className="w-14 h-14 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center mb-6">
-                <span className="text-2xl">✨</span>
-              </div>
+  <Sparkles size={28} />
+</div>
 
               <h3 className="text-2xl font-bold text-gray-900 mb-3">
                 Full Wash
@@ -111,15 +112,13 @@ function Services() {
 
 
             {/* PREMIUM DETAIL */}
-            <div className="border-2 border-blue-600 rounded-2xl p-8 shadow-lg relative">
+            <div className="border border-gray-200 hover:border-blue-600 shadow-xl rounded-2xl p-8 transition duration-300">
 
-              <span className="absolute top-5 right-5 bg-blue-600 text-white text-xs font-semibold px-3 py-1 rounded-full">
-                POPULAR
-              </span>
+              
 
               <div className="w-14 h-14 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center mb-6">
-                <span className="text-2xl">💎</span>
-              </div>
+  <Gem size={28} />
+</div>
 
               <h3 className="text-2xl font-bold text-gray-900 mb-3">
                 Premium Detail
