@@ -1,18 +1,31 @@
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 
 function Navbar() {
+
+  const location = useLocation()
+
+const isServicesPage = location.pathname === '/services'
+
+const textColor = isServicesPage ? 'text-gray-900' : 'text-white'
+
   return (
-    <nav className="absolute top-0 left-0 w-full z-50 flex items-center px-10 py-6">
+
+    
+    <nav
+  className={`absolute top-0 left-0 w-full z-50 flex items-center px-10 py-6 ${
+    isServicesPage ? 'border-b border-gray-300/40' : ''
+  }`}
+>
       {/* Logo */}
       <Link
         to="/"
-        className="text-2xl font-bold text-white tracking-wide font-[times new roman]"
+        className={`text-2xl font-bold ${textColor} tracking-wide font-[times new roman]`}
       >
         Express Car Wash
       </Link>
 
       {/* Center Navigation */}
-      <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-10 text-lg font-medium text-white font-[Montserrat]">
+      <div  className={`absolute left-1/2 -translate-x-1/2 flex items-center gap-10 text-lg font-medium ${textColor} font-[Montserrat]`}>
 
         <Link
           to="/"

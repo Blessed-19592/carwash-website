@@ -1,28 +1,42 @@
 import { CarFront, Sparkles, Gem } from "lucide-react";
+import servicesHero from "../assets/services-hero.jpg";
 
 function Services() {
   return (
     <div>
 
       {/* SERVICES HERO */}
-      <section className="bg-white py-24 px-6 md:px-16">
-        <div className="max-w-6xl mx-auto text-center">
+<section className="bg-gray-100 pt-36 pb-20 px-6 md:px-16">
+  <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
 
-          <p className="text-blue-400 uppercase tracking-widest text-sm font-semibold mb-3">
-            What We Offer
-          </p>
+    {/* LEFT: TEXT */}
+    <div>
+      <p className="text-blue-600 uppercase tracking-widest text-sm font-semibold mb-4">
+        What We Offer
+      </p>
 
-          <h1 className="text-4xl md:text-6xl font-bold text-gray-900 mb-6">
-            Our Services
-          </h1>
+      <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6 leading-tight">
+        Professional Care for Every Vehicle
+      </h1>
 
-          <p className="text-gray-600 text-lg max-w-2xl mx-auto">
-            Professional cleaning and detailing services designed to
-            keep your vehicle looking and feeling its best.
-          </p>
+      <p className="text-gray-600 text-lg leading-relaxed">
+        From motorcycles to cars and trucks, we provide reliable
+        cleaning and detailing services to keep your vehicle
+        clean and looking its best.
+      </p>
+    </div>
 
-        </div>
-      </section>
+    {/* RIGHT: IMAGE */}
+    <div>
+          <img
+  src={servicesHero}
+  alt="Professional vehicle washing"
+  className="w-full h-80 md:h-[450px] object-cover object-center rounded-2xl"
+/>
+    </div>
+
+  </div>
+</section>
 
 
       {/* MAIN SERVICES */}
