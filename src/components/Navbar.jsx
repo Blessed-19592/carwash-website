@@ -4,16 +4,16 @@ function Navbar() {
 
   const location = useLocation()
 
-const isServicesPage = location.pathname === '/services'
+const isLightPage = ['/services', '/about'].includes(location.pathname)
 
-const textColor = isServicesPage ? 'text-gray-900' : 'text-white'
+const textColor = isLightPage ? 'text-gray-900' : 'text-white'
 
   return (
 
     
     <nav
   className={`absolute top-0 left-0 w-full z-50 flex items-center px-10 py-6 ${
-    isServicesPage ? 'border-b border-gray-300/40' : ''
+    isLightPage ? 'border-b border-gray-300/40' : ''
   }`}
 >
       {/* Logo */}

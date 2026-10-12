@@ -246,26 +246,23 @@ function Services() {
   </div>
 
 </div>
-```
+
 
   </div>
 </section>
 
-      {/* CTA SECTION */}
+  {/* CTA SECTION */}
 
 <section className="bg-white py-16 px-6 md:px-16">
-  <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
+  <div className="max-w-4xl mx-auto flex flex-col items-center text-center">
 
-```
-<div>
-  <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-3">
-    Ready when you are
-  </h2>
+<h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-3">
+  Ready when you are
+</h2>
 
-  <p className="text-gray-600 text-lg">
-    Give your vehicle the care it deserves.
-  </p>
-</div>
+<p className="text-gray-600 text-lg mb-6">
+  Give your vehicle the care it deserves.
+</p>
 
 <Link
   to="/booking"
@@ -273,11 +270,10 @@ function Services() {
 >
   Book Now
 </Link>
-```
+
 
   </div>
 </section>
-
 
       
 
