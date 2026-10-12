@@ -337,6 +337,29 @@ function About() {
   </div>
 </section>
 
+{/* FINAL CTA SECTION */}
+<section className="bg-white py-16 px-6">
+  <div className="max-w-4xl mx-auto text-center">
+
+    <h2 className="text-3xl md:text-4xl font-bold text-grey-800 mb-5">
+      Your Vehicle Deserves the Best Care
+    </h2>
+
+    <p className="text-gray-900 leading-7 mb-8 max-w-2xl mx-auto">
+      Whether you ride a motorcycle, drive a car, or manage a truck,
+      we're ready to help you keep your vehicle clean.
+    </p>
+
+    <a
+      href="/contact"
+      className="inline-block bg-blue-600 hover:bg-blue-700 text-white font-semibold px-8 py-3 rounded-lg transition duration-300"
+    >
+      Get in Touch
+    </a>
+
+  </div>
+</section>
+
 
 
     </div>
