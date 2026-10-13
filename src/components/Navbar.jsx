@@ -1,13 +1,12 @@
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation, NavLink } from 'react-router-dom'
 
 function Navbar() {
 
   const location = useLocation()
 
-const isLightPage = ['/services', '/about'].includes(location.pathname)
+const isLightPage = ['/services', '/about', '/contact'].includes(location.pathname)
 
 const textColor = isLightPage ? 'text-gray-900' : 'text-white'
-
   return (
 
     
@@ -25,37 +24,54 @@ const textColor = isLightPage ? 'text-gray-900' : 'text-white'
       </Link>
 
       {/* Center Navigation */}
-      <div  className={`absolute left-1/2 -translate-x-1/2 flex items-center gap-10 text-lg font-medium ${textColor} font-[Montserrat]`}>
+<div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-10 text-lg font-medium font-[Montserrat]">
 
-        <Link
-          to="/"
-          className="hover:text-blue-500 transition duration-500"
-        >
-          Home
-        </Link>
+  <NavLink
+    to="/"
+    end
+    className={({ isActive }) =>
+      `transition duration-300 ${
+        isActive ? 'text-blue-600' : `${textColor} hover:text-blue-500`
+      }`
+    }
+  >
+    Home
+  </NavLink>
 
-        <Link
-          to="/services"
-          className="hover:text-blue-500 transition duration-300"
-        >
-          Services
-        </Link>
+  <NavLink
+    to="/services"
+    className={({ isActive }) =>
+      `transition duration-300 ${
+        isActive ? 'text-blue-600' : `${textColor} hover:text-blue-500`
+      }`
+    }
+  >
+    Services
+  </NavLink>
 
-        <Link
-          to="/about"
-          className="hover:text-blue-500 transition duration-300"
-        >
-          About
-        </Link>
+  <NavLink
+    to="/about"
+    className={({ isActive }) =>
+      `transition duration-300 ${
+        isActive ? 'text-blue-600' : `${textColor} hover:text-blue-500`
+      }`
+    }
+  >
+    About Us
+  </NavLink>
 
-        <Link
-          to="/gallery"
-          className="hover:text-blue-500 transition duration-300"
-        >
-          Gallery
-        </Link>
+  <NavLink
+    to="/contact"
+    className={({ isActive }) =>
+      `transition duration-300 ${
+        isActive ? 'text-blue-600' : `${textColor} hover:text-blue-500`
+      }`
+    }
+  >
+    Contact Us
+  </NavLink>
 
-      </div>
+</div>
 
       {/* Booking Button */}
       <Link

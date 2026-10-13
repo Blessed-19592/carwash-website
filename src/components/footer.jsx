@@ -40,9 +40,7 @@ function Footer() {
                 About Us
               </Link>
 
-              <Link to="/gallery" className="w-fit hover:text-blue-400 transition duration-300">
-                Gallery
-              </Link>
+            
 
               <Link to="/contact" className="w-fit hover:text-blue-400 transition duration-300">
                 Contact Us
