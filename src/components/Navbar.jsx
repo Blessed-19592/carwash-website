@@ -4,7 +4,7 @@ function Navbar() {
 
   const location = useLocation()
 
-const isLightPage = ['/services', '/about', '/contact'].includes(location.pathname)
+const isLightPage = ['/services', '/about'].includes(location.pathname)
 
 const textColor = isLightPage ? 'text-gray-900' : 'text-white'
   return (
