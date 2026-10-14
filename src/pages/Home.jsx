@@ -48,7 +48,7 @@ function Home() {
       {/* SERVICES */}
       <section
         id="services"
-        className="py-20 px-6 md:px-16 bg-gray-50"
+        className="py-20 px-6 md:px-16 bg-gray-200"
       >
 
         {/* Section Heading */}
@@ -238,7 +238,7 @@ function Home() {
 </section>
 
 {/* HOW IT WORKS */}
-<section className="py-20 px-6 md:px-16 bg-gray-50">
+<section className="py-20 px-6 md:px-16 bg-gray-200">
 
   <div className="max-w-6xl mx-auto">
 

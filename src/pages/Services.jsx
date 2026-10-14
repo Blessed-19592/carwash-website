@@ -10,7 +10,7 @@ function Services() {
     <div>
 
       {/* SERVICES HERO */}
-<section className="bg-slate-50 pt-36 pb-20 px-6 md:px-16">
+<section className="bg-gray-200 pt-36 pb-20 px-6 md:px-16">
   <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
 
     {/* LEFT: TEXT */}
@@ -47,7 +47,7 @@ function Services() {
 <section className="bg-white py-20 px-6 md:px-16">
   <div className="max-w-6xl mx-auto">
 
-```
+
 {/* Section Heading */}
 <div className="text-center mb-12">
   <p className="text-blue-600 uppercase tracking-widest text-sm font-semibold mb-3">
@@ -130,7 +130,7 @@ function Services() {
   </div>
 
 </div>
-```
+
 
   </div>
 </section>
@@ -138,10 +138,10 @@ function Services() {
 
      {/* MAIN SERVICES */}
 
-<section className="bg-slate-50 py-24 px-6 md:px-16">
+<section className="bg-gray-200 py-24 px-6 md:px-16">
   <div className="max-w-6xl mx-auto">
 
-```
+
 {/* SECTION HEADER */}
 <div className="text-center mb-16">
   <p className="text-blue-600 uppercase tracking-widest text-sm font-semibold mb-3">
@@ -162,7 +162,7 @@ function Services() {
 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 items-stretch">
 
   {/* BASIC WASH */}
-  <div className="group flex flex-col border border-gray-200 hover:border-blue-600 shadow-md hover:shadow-xl rounded-2xl p-8 transition-all duration-300">
+  <div className="group flex flex-col border border-gray-300 hover:border-blue-600 shadow-md hover:shadow-xl rounded-2xl p-8 transition-all duration-300">
 
     <div className="w-14 h-14 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center mb-6 group-hover:bg-blue-600 group-hover:text-white transition duration-300">
       <CarFront size={28} />
@@ -190,7 +190,7 @@ function Services() {
   </div>
 
   {/* FULL WASH */}
-  <div className="group flex flex-col border border-gray-200 hover:border-blue-600 shadow-md hover:shadow-xl rounded-2xl p-8 transition-all duration-300">
+  <div className="group flex flex-col border border-gray-300 hover:border-blue-600 shadow-md hover:shadow-xl rounded-2xl p-8 transition-all duration-300">
 
     <div className="w-14 h-14 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center mb-6 group-hover:bg-blue-600 group-hover:text-white transition duration-300">
       <Sparkles size={28} />
@@ -218,7 +218,7 @@ function Services() {
   </div>
 
   {/* PREMIUM DETAIL */}
-  <div className="group flex flex-col border border-gray-200 hover:border-blue-600 shadow-md hover:shadow-xl rounded-2xl p-8 transition-all duration-300">
+  <div className="group flex flex-col border border-gray-300 hover:border-blue-600 shadow-md hover:shadow-xl rounded-2xl p-8 transition-all duration-300">
 
     <div className="w-14 h-14 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center mb-6 group-hover:bg-blue-600 group-hover:text-white transition duration-300">
       <Gem size={28} />
