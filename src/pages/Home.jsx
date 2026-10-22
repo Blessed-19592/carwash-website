@@ -37,9 +37,12 @@ function Home() {
             drive in, relax, and let us handle the rest.
           </p>
 
-          <button className="bg-blue-600 text-white px-6 py-3 rounded-md font-semibold font-[Montserrat] hover:bg-blue-800 transition duration-300">
-            Book Now
-          </button>
+          <Link
+  to="/booking"
+  className="inline-block rounded-lg bg-blue-600 px-8 py-4 font-semibold text-white transition duration-300 hover:bg-blue-700"
+>
+  Book Now
+</Link>
 
         </div>
       </section>
@@ -327,9 +330,12 @@ function Home() {
     Ready when you are
   </h2>
 
-  <button className="bg-blue-600 hover:bg-blue-700 text-white px-7 py-3 rounded-md font-semibold transition duration-300">
-    Book Now
-  </button>
+  <Link
+  to="/booking"
+  className="inline-block rounded-lg bg-blue-600 px-8 py-4 font-semibold text-white transition duration-300 hover:bg-blue-700"
+>
+  Book Now
+</Link>
 
 </section>
 

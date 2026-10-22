@@ -184,9 +184,12 @@ function Services() {
       <li>✓ Exterior drying</li>
     </ul>
 
-    <button className="mt-auto self-start text-blue-600 font-semibold hover:text-blue-800 transition">
-      Book this service →
-    </button>
+    <Link
+  to="/booking?service=Basic%20Wash"
+  className="mt-auto self-start text-blue-600 font-semibold transition hover:text-blue-800"
+>
+  Book this service →
+</Link>
   </div>
 
   {/* FULL WASH */}
@@ -212,9 +215,12 @@ function Services() {
       <li>✓ Interior wipe-down</li>
     </ul>
 
-    <button className="mt-auto self-start text-blue-600 font-semibold hover:text-blue-800 transition">
-      Book this service →
-    </button>
+       <Link
+  to="/booking?service=Full%20Wash"
+  className="mt-auto self-start text-blue-600 font-semibold transition hover:text-blue-800"
+>
+  Book this service →
+</Link>
   </div>
 
   {/* PREMIUM DETAIL */}
@@ -240,9 +246,12 @@ function Services() {
       <li>✓ Tyre & wheel treatment</li>
     </ul>
 
-    <button className="mt-auto self-start text-blue-600 font-semibold hover:text-blue-800 transition">
-      Book this service →
-    </button>
+    <Link
+  to="/booking?service=Premium%20Detail"
+  className="mt-auto self-start text-blue-600 font-semibold transition hover:text-blue-800"
+>
+  Book this service →
+</Link>
   </div>
 
 </div>
