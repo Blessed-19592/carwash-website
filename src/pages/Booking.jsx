@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 
@@ -22,8 +23,24 @@ const prices = {
   },
 }
 
+const OPENING_TIME = '08:30'
+const CLOSING_TIME = '19:30'
+
+// Sunday = 0, Monday = 1, ..., Saturday = 6
+const CLOSED_DAYS = [6]
+
 const formatPrice = (price) =>
   `KSh ${price.toLocaleString('en-KE')}`
+
+// Format today's date using the computer's local calendar date.
+function getToday() {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+
+  return `${year}-${month}-${day}`
+}
 
 function Booking() {
   const [searchParams] = useSearchParams()
@@ -39,11 +56,13 @@ function Booking() {
   })
 
   const [message, setMessage] = useState('')
+  const [messageType, setMessageType] = useState('error')
 
-  // Preselect a service when the customer comes from the Services page.
+  const today = getToday()
+
+  // Preselect a service when arriving from the Services page.
   useEffect(() => {
     const requestedService = searchParams.get('service')
-
     const availableServices = Object.keys(prices.Car)
 
     if (availableServices.includes(requestedService)) {
@@ -53,25 +72,39 @@ function Booking() {
     }
   }, [searchParams])
 
-  // Motorcycles can only receive a Full Wash.
+  // Automatically select Full Wash for motorcycles.
+  // Only depend on vehicle to prevent unnecessary effect loops.
   useEffect(() => {
     if (vehicle === 'Motorcycle') {
       setService('Full Wash')
-    } else if (service && !prices[vehicle][service]) {
-      setService('')
     }
-  }, [vehicle, service])
+  }, [vehicle])
 
   const availableServices = Object.keys(prices[vehicle])
 
-  const selectedPrice = service
-    ? prices[vehicle][service]
-    : null
+  // Prevent undefined prices from being formatted during state changes.
+  const selectedPrice =
+    service && prices[vehicle][service] !== undefined
+      ? prices[vehicle][service]
+      : null
 
-  const today = new Date().toLocaleDateString('en-CA')
+  function showMessage(text, type = 'error') {
+    setMessage(text)
+    setMessageType(type)
+  }
 
   function handleVehicleChange(e) {
-    setVehicle(e.target.value)
+    const newVehicle = e.target.value
+
+    setVehicle(newVehicle)
+
+    // Update the service immediately when changing vehicle.
+    if (newVehicle === 'Motorcycle') {
+      setService('Full Wash')
+    } else if (service && prices[newVehicle][service] === undefined) {
+      setService('')
+    }
+
     setMessage('')
   }
 
@@ -91,21 +124,123 @@ function Booking() {
     setMessage('')
   }
 
+  // Validate the selected date.
+  function isBookingDateAllowed(dateValue) {
+    if (!dateValue || dateValue < today) {
+      return false
+    }
+
+    const [year, month, day] = dateValue.split('-').map(Number)
+    const selectedDate = new Date(year, month - 1, day)
+
+    // Reject invalid calendar dates.
+    if (
+      selectedDate.getFullYear() !== year ||
+      selectedDate.getMonth() !== month - 1 ||
+      selectedDate.getDate() !== day
+    ) {
+      return false
+    }
+
+    // Saturday is closed.
+    if (CLOSED_DAYS.includes(selectedDate.getDay())) {
+      return false
+    }
+
+    return true
+  }
+
+  // Validate the selected time against opening hours.
+  function isBookingTimeAllowed(timeValue) {
+    if (!timeValue) {
+      return false
+    }
+
+    return (
+      timeValue >= OPENING_TIME &&
+      timeValue <= CLOSING_TIME
+    )
+  }
+
+  function handleDateChange(e) {
+    const value = e.target.value
+
+    setFormData((previous) => ({
+      ...previous,
+      date: value,
+    }))
+
+    if (!value) {
+      setMessage('')
+      return
+    }
+
+    if (value < today) {
+      showMessage('Please choose today or a future date.')
+      return
+    }
+
+    if (!isBookingDateAllowed(value)) {
+      showMessage(
+        'We are closed on Saturdays. Please choose Sunday to Friday.'
+      )
+      return
+    }
+
+    setMessage('')
+  }
+
+  function handleTimeChange(e) {
+    const value = e.target.value
+
+    setFormData((previous) => ({
+      ...previous,
+      time: value,
+    }))
+
+    if (!value) {
+      setMessage('')
+      return
+    }
+
+    if (!isBookingTimeAllowed(value)) {
+      showMessage(
+        'Our working hours are 8:30 AM to 7:30 PM.'
+      )
+      return
+    }
+
+    setMessage('')
+  }
+
   function handleSubmit(e) {
     e.preventDefault()
 
-    if (!service) {
-      setMessage('Please select a wash service.')
+    // Confirm that the selected service is available.
+    if (prices[vehicle][service] === undefined) {
+      showMessage('Please select a valid wash service.')
       return
     }
 
-    if (!selectedPrice) {
-      setMessage('The selected service is unavailable.')
+    // Check the date.
+    if (!isBookingDateAllowed(formData.date)) {
+      showMessage(
+        'Please choose a valid date. We are closed on Saturdays and do not accept bookings for past dates.'
+      )
       return
     }
 
-    setMessage(
-      'Your form is complete, but booking submission has not been connected yet. Your booking has NOT been sent or saved.'
+    // Check the time.
+    if (!isBookingTimeAllowed(formData.time)) {
+      showMessage(
+        'Please choose a time between 8:30 AM and 7:30 PM.'
+      )
+      return
+    }
+
+    showMessage(
+      'Your details are valid, but booking submission has not been connected yet. Your booking has NOT been sent or saved.',
+      'success'
     )
   }
 
@@ -116,7 +251,8 @@ function Booking() {
     'mb-2 block text-sm font-semibold text-gray-700'
 
   return (
-    <main className="min-h-screen bg-gray-100 pt-32 pb-20 px-5 md:px-10">
+    <main className="min-h-screen bg-gray-100 px-5 pb-20 pt-32 md:px-10">
+
       {/* Page heading */}
       <div className="mx-auto mb-12 max-w-3xl text-center">
         <p className="mb-3 text-sm font-semibold uppercase tracking-widest text-blue-600">
@@ -235,6 +371,8 @@ function Booking() {
 
             {/* Date and time */}
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+
+              {/* Date */}
               <div>
                 <label htmlFor="date" className={labelStyle}>
                   Preferred Date
@@ -246,12 +384,17 @@ function Booking() {
                   type="date"
                   min={today}
                   value={formData.date}
-                  onChange={handleInputChange}
+                  onChange={handleDateChange}
                   className={inputStyle}
                   required
                 />
+
+                <p className="mt-2 text-xs text-gray-500">
+                  Available Sunday through Friday. Closed Saturday.
+                </p>
               </div>
 
+              {/* Time */}
               <div>
                 <label htmlFor="time" className={labelStyle}>
                   Preferred Time
@@ -261,11 +404,17 @@ function Booking() {
                   id="time"
                   name="time"
                   type="time"
+                  min={OPENING_TIME}
+                  max={CLOSING_TIME}
                   value={formData.time}
-                  onChange={handleInputChange}
+                  onChange={handleTimeChange}
                   className={inputStyle}
                   required
                 />
+
+                <p className="mt-2 text-xs text-gray-500">
+                  Available from 8:30 AM to 7:30 PM.
+                </p>
               </div>
             </div>
 
@@ -286,11 +435,16 @@ function Booking() {
               />
             </div>
 
-            {/* Submission status */}
+            {/* Status message */}
             {message && (
               <div
                 role="status"
-                className="rounded-lg bg-blue-50 p-4 text-sm text-blue-800"
+                aria-live="polite"
+                className={`rounded-lg p-4 text-sm ${
+                  messageType === 'success'
+                    ? 'bg-green-50 text-green-800'
+                    : 'bg-red-50 text-red-800'
+                }`}
               >
                 {message}
               </div>
@@ -305,7 +459,7 @@ function Booking() {
           </form>
         </section>
 
-        {/* Price summary */}
+        {/* Booking summary */}
         <aside className="rounded-2xl bg-gray-950 p-6 text-white shadow-md md:p-8">
           <h2 className="mb-2 text-2xl font-bold">
             Booking Summary
@@ -316,6 +470,7 @@ function Booking() {
           </p>
 
           <div className="space-y-5 border-b border-gray-700 pb-6">
+
             <div>
               <p className="mb-1 text-sm text-gray-400">
                 Vehicle
@@ -337,6 +492,7 @@ function Booking() {
             </div>
           </div>
 
+          {/* Price */}
           <div className="flex items-center justify-between gap-4 py-6">
             <span className="text-gray-300">Total Price</span>
 
@@ -347,6 +503,7 @@ function Booking() {
             </span>
           </div>
 
+          {/* Location */}
           <div className="rounded-xl bg-gray-800 p-4">
             <p className="mb-2 font-semibold">
               Our Location
@@ -359,9 +516,26 @@ function Booking() {
             </p>
           </div>
 
+          {/* Working hours */}
+          <div className="mt-5 rounded-xl bg-gray-800 p-4">
+            <p className="mb-2 font-semibold">
+              Working Hours
+            </p>
+
+            <p className="text-sm leading-relaxed text-gray-300">
+              Sunday – Friday
+              <br />
+              8:30 AM – 7:30 PM
+              <br />
+              <span className="text-red-300">
+                Saturday: Closed
+              </span>
+            </p>
+          </div>
+
           <p className="mt-6 text-sm leading-relaxed text-gray-400">
-            Your final service price is calculated automatically
-            based on your vehicle and selected wash.
+            Your price is calculated automatically based on
+            your vehicle and selected wash service.
           </p>
         </aside>
       </div>
@@ -370,3 +544,4 @@ function Booking() {
 }
 
 export default Booking
+
