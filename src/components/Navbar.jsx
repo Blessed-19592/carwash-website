@@ -1,3 +1,4 @@
+
 import { Link, useLocation, NavLink } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { Menu, X } from 'lucide-react'
@@ -27,44 +28,71 @@ function Navbar() {
     }
   }, [])
 
-  // Close the mobile menu when navigating to another page
+  // Close the mobile menu whenever the route changes.
   useEffect(() => {
     setMenuOpen(false)
   }, [location.pathname])
 
-  // Pages that get a white navbar
-  const isLightPage = ['/services', '/about'].includes(location.pathname)
+  // Pages that use a light background.
+  const isLightPage = ['/services', '/about', '/booking'].includes(
+    location.pathname
+  )
 
   const whiteNav = scrolled && isLightPage
   const blueNav = scrolled && !isLightPage
 
+  // Dark text on light pages; white text on dark pages.
   const textColor = isLightPage ? 'text-gray-900' : 'text-white'
 
+  // Keep the booking navbar readable even before scrolling.
   const navBg = !scrolled
-    ? 'bg-transparent py-4 md:py-6'
+    ? isLightPage
+      ? 'bg-white/95 backdrop-blur-md shadow-sm py-3 md:py-4'
+      : 'bg-transparent py-4 md:py-6'
     : isLightPage
-      ? 'bg-white backdrop-blur-md shadow-lg py-3 md:py-4'
+      ? 'bg-white/95 backdrop-blur-md shadow-lg py-3 md:py-4'
       : 'bg-gray-950/95 backdrop-blur-md shadow-lg py-3 md:py-4'
 
+  // Active navigation link.
   const activeColor = blueNav
     ? 'text-white underline underline-offset-8'
-    : 'text-blue-500'
+    : 'text-blue-600 underline underline-offset-8'
 
-  const hoverColor = blueNav ? 'hover:text-blue-200' : 'hover:text-blue-500'
+  const hoverColor = blueNav
+    ? 'hover:text-blue-200'
+    : 'hover:text-blue-600'
 
+  // Booking button colors.
   const buttonStyle = blueNav
     ? 'bg-white text-blue-600 hover:bg-blue-50'
     : 'bg-blue-600 text-white hover:bg-blue-800'
 
-  // Colors for the mobile menu button
-  const menuIconColor = whiteNav
+  // Hamburger icon colors.
+  const menuIconColor = isLightPage
     ? 'text-gray-900'
-    : textColor
+    : 'text-white'
+
+  // Mobile menu background and text colors.
+  const mobileMenuBg = isLightPage
+    ? 'bg-white'
+    : blueNav
+      ? 'bg-blue-700'
+      : 'bg-gray-950'
+
+  const mobileTextColor = isLightPage
+    ? 'text-gray-900'
+    : 'text-white'
+
+  const mobileActiveColor = blueNav
+    ? 'text-white font-bold underline underline-offset-4'
+    : 'text-blue-600 font-bold'
 
   return (
     <nav
       className={`fixed top-0 left-0 w-full z-50 transition-all duration-300 ${navBg} ${
-        isLightPage && !scrolled ? 'border-b border-gray-300/40' : ''
+        isLightPage && !scrolled
+          ? 'border-b border-gray-300/40'
+          : ''
       }`}
     >
       <div className="flex items-center justify-between px-5 sm:px-8 lg:px-10">
@@ -109,7 +137,11 @@ function Navbar() {
         <button
           type="button"
           onClick={() => setMenuOpen(!menuOpen)}
-          aria-label={menuOpen ? 'Close navigation menu' : 'Open navigation menu'}
+          aria-label={
+            menuOpen
+              ? 'Close navigation menu'
+              : 'Open navigation menu'
+          }
           aria-expanded={menuOpen}
           aria-controls="mobile-navigation"
           className={`lg:hidden p-2 rounded-md transition ${menuIconColor} hover:bg-black/10`}
@@ -118,20 +150,14 @@ function Navbar() {
         </button>
       </div>
 
-      {/* Mobile Navigation Menu */}
+      {/* Mobile Navigation */}
       <div
         id="mobile-navigation"
         className={`lg:hidden overflow-hidden transition-all duration-300 ${
-          menuOpen ? 'max-h-[420px] opacity-100' : 'max-h-0 opacity-0'
-        } ${
-          whiteNav
-            ? 'bg-white'
-            : blueNav
-              ? 'bg-blue-700'
-              : isLightPage
-                ? 'bg-white'
-                : 'bg-gray-950'
-        }`}
+          menuOpen
+            ? 'max-h-[420px] opacity-100'
+            : 'max-h-0 opacity-0'
+        } ${mobileMenuBg}`}
       >
         <div className="flex flex-col px-6 pt-3 pb-6 space-y-1 font-[Montserrat]">
 
@@ -141,22 +167,13 @@ function Navbar() {
               to={link.to}
               end={link.end}
               onClick={() => setMenuOpen(false)}
-              className={({ isActive }) => {
-                const mobileTextColor =
-                  whiteNav || (!scrolled && isLightPage)
-                    ? 'text-gray-900'
-                    : 'text-white'
-
-                const mobileActiveColor = blueNav
-                  ? 'text-white font-bold underline underline-offset-4'
-                  : 'text-blue-500 font-bold'
-
-                return `block py-3 px-3 rounded-md transition duration-200 ${
+              className={({ isActive }) =>
+                `block py-3 px-3 rounded-md transition duration-200 ${
                   isActive
                     ? mobileActiveColor
                     : `${mobileTextColor} hover:text-blue-500 hover:bg-gray-500/10`
                 }`
-              }}
+              }
             >
               {link.label}
             </NavLink>
@@ -178,3 +195,4 @@ function Navbar() {
 }
 
 export default Navbar
+
