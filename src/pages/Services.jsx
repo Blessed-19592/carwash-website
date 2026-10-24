@@ -322,6 +322,35 @@ function Services() {
   Premium Detail
 </h3>
 
+{/* PRICES FROM DATABASE */}
+<div className="mb-5 rounded-lg bg-blue-50 p-4">
+  <h4 className="mb-3 font-semibold text-gray-900">
+    Prices by Vehicle
+  </h4>
+
+  {loading ? (
+    <p className="text-sm text-gray-500">Loading prices...</p>
+  ) : error ? (
+    <p className="text-sm text-red-600">{error}</p>
+  ) : (
+    <ul className="space-y-2 text-sm text-gray-700">
+      {services
+        .filter((service) => service.service_name === "Premium Detail")
+        .map((service) => (
+          <li
+            key={service.service_id}
+            className="flex justify-between gap-4"
+          >
+            <span>{service.vehicle_type}</span>
+            <span className="font-semibold">
+              KSh {Number(service.price).toLocaleString("en-KE")}
+            </span>
+          </li>
+        ))}
+    </ul>
+  )}
+</div>
+
     <p className="text-gray-600 mb-6">
       Our complete detailing service for customers who want
       their vehicle looking its absolute best.
