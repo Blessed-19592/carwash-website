@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { CarFront, Sparkles, Gem } from "lucide-react";
 import servicesHero from "../assets/services-hero.jpg";
 import apiko2 from "../assets/apiko2.jpg";
@@ -6,6 +7,35 @@ import hero2 from "../assets/hero2.jpg";
 import { Link } from "react-router-dom";
 
 function Services() {
+
+  
+  const [services, setServices] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    async function fetchServices() {
+      try {
+        const response = await fetch("http://localhost:5000/api/services");
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch services.");
+        }
+
+        const data = await response.json();
+        setServices(data.services);
+      } catch (err) {
+        console.error("Error fetching services:", err);
+        setError("Unable to load service prices. Please try again later.");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchServices();
+  }, []);
+
+  
   return (
     <div>
 
@@ -172,6 +202,35 @@ function Services() {
       Basic Wash
     </h3>
 
+    {/* PRICES FROM DATABASE */}
+<div className="mb-5 rounded-lg bg-blue-50 p-4">
+  <h4 className="mb-3 font-semibold text-gray-900">
+    Prices by Vehicle
+  </h4>
+
+  {loading ? (
+    <p className="text-sm text-gray-500">Loading prices...</p>
+  ) : error ? (
+    <p className="text-sm text-red-600">{error}</p>
+  ) : (
+    <ul className="space-y-2 text-sm text-gray-700">
+      {services
+        .filter((service) => service.service_name === "Basic Wash")
+        .map((service) => (
+          <li
+            key={service.service_id}
+            className="flex justify-between gap-4"
+          >
+            <span>{service.vehicle_type}</span>
+            <span className="font-semibold">
+              KSh {Number(service.price).toLocaleString("en-KE")}
+            </span>
+          </li>
+        ))}
+    </ul>
+  )}
+</div>
+
     <p className="text-gray-600 mb-6">
       A quick and effective clean for keeping your vehicle
       fresh and looking great every day.
@@ -200,8 +259,37 @@ function Services() {
     </div>
 
     <h3 className="text-2xl font-bold text-gray-900 mb-3">
-      Full Wash
-    </h3>
+  Full Wash
+</h3>
+
+{/* PRICES FROM DATABASE */}
+<div className="mb-5 rounded-lg bg-blue-50 p-4">
+  <h4 className="mb-3 font-semibold text-gray-900">
+    Prices by Vehicle
+  </h4>
+
+  {loading ? (
+    <p className="text-sm text-gray-500">Loading prices...</p>
+  ) : error ? (
+    <p className="text-sm text-red-600">{error}</p>
+  ) : (
+    <ul className="space-y-2 text-sm text-gray-700">
+      {services
+        .filter((service) => service.service_name === "Full Wash")
+        .map((service) => (
+          <li
+            key={service.service_id}
+            className="flex justify-between gap-4"
+          >
+            <span>{service.vehicle_type}</span>
+            <span className="font-semibold">
+              KSh {Number(service.price).toLocaleString("en-KE")}
+            </span>
+          </li>
+        ))}
+    </ul>
+  )}
+</div>
 
     <p className="text-gray-600 mb-6">
       A complete cleaning service for both the exterior and
@@ -230,9 +318,9 @@ function Services() {
       <Gem size={28} />
     </div>
 
-    <h3 className="text-2xl font-bold text-gray-900 mb-3">
-      Premium Detail
-    </h3>
+       <h3 className="text-2xl font-bold text-gray-900 mb-3">
+  Premium Detail
+</h3>
 
     <p className="text-gray-600 mb-6">
       Our complete detailing service for customers who want

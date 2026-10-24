@@ -528,7 +528,7 @@ function Booking() {
               8:30 AM – 7:30 PM
               <br />
               <span className="text-red-300">
-                Saturday: Closed
+                Saturday - Closed
               </span>
             </p>
           </div>
