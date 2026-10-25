@@ -1,8 +1,9 @@
-const pool = require('./config/db');
 
 const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
+
+const pool = require('./config/db');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -18,7 +19,7 @@ app.get('/', (req, res) => {
   });
 });
 
-// Test route
+// Health check route
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'success',
@@ -26,6 +27,7 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// Get active services from PostgreSQL
 app.get('/api/services', async (req, res) => {
   try {
     const result = await pool.query(
@@ -35,39 +37,73 @@ app.get('/api/services', async (req, res) => {
        ORDER BY service_id ASC`
     );
 
-    res.json({
+    return res.json({
       status: 'success',
       count: result.rows.length,
-      services: result.rows
+      services: result.rows,
     });
   } catch (error) {
     console.error('Error fetching services:', error.message);
 
-    res.status(500).json({
+    return res.status(500).json({
       status: 'error',
-      message: 'Failed to retrieve services.'
+      message: 'Failed to retrieve services.',
     });
   }
 });
 
+// Create a booking
 app.post('/api/bookings', async (req, res) => {
-  const { fullName, phone, date, time, vehicle, service, notes } = req.body;
+  const { fullName, phone, date, time, vehicle, service, notes } =
+    req.body;
 
   // 1. Validate required fields
-  if (!fullName || !phone || !date || !time || !vehicle || !service) {
+  if (
+    typeof fullName !== 'string' ||
+    !fullName.trim() ||
+    typeof phone !== 'string' ||
+    !phone.trim() ||
+    !date ||
+    !time ||
+    !vehicle ||
+    !service
+  ) {
     return res.status(400).json({
       status: 'error',
-      message: 'Please provide all required booking details.'
+      message: 'Please provide all required booking details.',
     });
   }
 
-  // 2. Start a database transaction
-  const client = await pool.connect();
+  // 2. Validate Kenyan mobile phone number format
+  const normalizedPhone = phone.trim().replace(/[\s-]/g, '');
+
+  const kenyanPhonePattern = /^(?:\+254|254|0)(?:7\d{8}|1\d{8})$/;
+
+  if (!kenyanPhonePattern.test(normalizedPhone)) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'Please enter a valid Kenyan mobile number.',
+    });
+  }
+
+  // 3. Validate optional notes
+  if (notes !== undefined && notes !== null && typeof notes !== 'string') {
+    return res.status(400).json({
+      status: 'error',
+      message: 'Booking notes must be text.',
+    });
+  }
+
+  // 4. Connect to PostgreSQL
+  let client;
 
   try {
+    client = await pool.connect();
+
+    // Begin transaction
     await client.query('BEGIN');
 
-    // 3. Find the selected service and get its actual database price
+    // 5. Find the selected active service and its database price
     const serviceResult = await client.query(
       `SELECT service_id, price
        FROM services
@@ -82,28 +118,28 @@ app.post('/api/bookings', async (req, res) => {
 
       return res.status(400).json({
         status: 'error',
-        message: 'The selected service is unavailable for this vehicle.'
+        message: 'The selected service is unavailable for this vehicle.',
       });
     }
 
     const selectedService = serviceResult.rows[0];
     const amount = selectedService.price;
 
-    // 4. Reuse the customer if their phone number already exists
+    // 6. Find an existing customer by normalized phone number
     let customerResult = await client.query(
       `SELECT customer_id
        FROM customers
        WHERE phone = $1
        LIMIT 1`,
-      [phone.trim()]
+      [normalizedPhone]
     );
 
     let customerId;
 
     if (customerResult.rows.length > 0) {
+      // Reuse the existing customer
       customerId = customerResult.rows[0].customer_id;
 
-      // Update the customer's name with the latest submitted name
       await client.query(
         `UPDATE customers
          SET full_name = $1
@@ -111,18 +147,18 @@ app.post('/api/bookings', async (req, res) => {
         [fullName.trim(), customerId]
       );
     } else {
-      // 5. Create a new customer if the phone number is not registered
+      // Create a new customer
       customerResult = await client.query(
         `INSERT INTO customers (full_name, phone)
          VALUES ($1, $2)
          RETURNING customer_id`,
-        [fullName.trim(), phone.trim()]
+        [fullName.trim(), normalizedPhone]
       );
 
       customerId = customerResult.rows[0].customer_id;
     }
 
-    // 6. Save the booking
+    // 7. Save the booking
     const bookingResult = await client.query(
       `INSERT INTO bookings (
          customer_id,
@@ -133,39 +169,51 @@ app.post('/api/bookings', async (req, res) => {
          notes
        )
        VALUES ($1, $2, $3, $4, $5, $6)
-       RETURNING booking_id, status, amount, booking_date, booking_time`,
+       RETURNING
+         booking_id,
+         status,
+         amount,
+         booking_date,
+         booking_time`,
       [
         customerId,
         selectedService.service_id,
         date,
         time,
         amount,
-        notes?.trim() || null
+        notes?.trim() || null,
       ]
     );
 
-    // 7. Commit the transaction
+    // 8. Commit the transaction
     await client.query('COMMIT');
 
-    // 8. Send confirmation data to the frontend
+    // 9. Return the booking confirmation
     return res.status(201).json({
       status: 'success',
       message: 'Your booking has been submitted successfully!',
-      booking: bookingResult.rows[0]
+      booking: bookingResult.rows[0],
     });
-
   } catch (error) {
-    await client.query('ROLLBACK');
+    // Roll back only if a transaction was started
+    if (client) {
+      try {
+        await client.query('ROLLBACK');
+      } catch (rollbackError) {
+        console.error('Transaction rollback failed:', rollbackError.message);
+      }
+    }
 
     console.error('Error creating booking:', error.message);
 
     return res.status(500).json({
       status: 'error',
-      message: 'Unable to save your booking. Please try again.'
+      message: 'Unable to save your booking. Please try again.',
     });
-
   } finally {
-    client.release();
+    if (client) {
+      client.release();
+    }
   }
 });
 
@@ -173,3 +221,4 @@ app.post('/api/bookings', async (req, res) => {
 app.listen(PORT, () => {
   console.log(`Express Car Wash API running at http://localhost:${PORT}`);
 });
+

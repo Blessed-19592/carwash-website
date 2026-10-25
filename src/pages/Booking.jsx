@@ -428,23 +428,29 @@ async function handleSubmit(e) {
             </div>
 
             {/* Phone number */}
-            <div>
-              <label htmlFor="phone" className={labelStyle}>
-                Phone Number
-              </label>
+            
+<div>
+  <label htmlFor="phone" className={labelStyle}>
+    Phone Number
+  </label>
 
-              <input
-                id="phone"
-                name="phone"
-                type="tel"
-                autoComplete="tel"
-                placeholder="Enter your phone number"
-                value={formData.phone}
-                onChange={handleInputChange}
-                className={inputStyle}
-                required
-              />
-            </div>
+  <input
+    id="phone"
+    name="phone"
+    type="tel"
+    autoComplete="tel"
+    placeholder="e.g. 0712345678 or +254712345678"
+    value={formData.phone}
+    onChange={handleInputChange}
+    className={inputStyle}
+    pattern="(?:\+254|254|0)7[0-9]{8}|(?:\+254|254|0)1[0-9]{8}"
+    title="Enter a valid Kenyan mobile number, e.g. 0712345678 or +254712345678."
+    maxLength={13}
+    required
+  />
+</div>
+
+
 
             {/* Vehicle */}
             <div>
