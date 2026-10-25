@@ -1,27 +1,5 @@
-
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-
-const prices = {
-  Car: {
-    'Basic Wash': 300,
-    'Full Wash': 600,
-    'Premium Detail': 1000,
-  },
-  'Small Truck': {
-    'Basic Wash': 500,
-    'Full Wash': 900,
-    'Premium Detail': 1200,
-  },
-  'Large Truck': {
-    'Basic Wash': 650,
-    'Full Wash': 1000,
-    'Premium Detail': 1500,
-  },
-  Motorcycle: {
-    'Full Wash': 150,
-  },
-}
 
 const OPENING_TIME = '08:30'
 const CLOSING_TIME = '19:30'
@@ -30,7 +8,7 @@ const CLOSING_TIME = '19:30'
 const CLOSED_DAYS = [6]
 
 const formatPrice = (price) =>
-  `KSh ${price.toLocaleString('en-KE')}`
+  `KSh ${Number(price).toLocaleString('en-KE')}`
 
 // Format today's date using the computer's local calendar date.
 function getToday() {
@@ -45,8 +23,15 @@ function getToday() {
 function Booking() {
   const [searchParams] = useSearchParams()
 
+  // Services and prices fetched from PostgreSQL
+  const [services, setServices] = useState([])
+  const [loadingServices, setLoadingServices] = useState(true)
+  const [servicesError, setServicesError] = useState('')
+
+  // Booking form state
   const [vehicle, setVehicle] = useState('Car')
   const [service, setService] = useState('')
+
   const [formData, setFormData] = useState({
     fullName: '',
     phone: '',
@@ -60,52 +45,124 @@ function Booking() {
 
   const today = getToday()
 
+  // Fetch available services from the backend.
+  useEffect(() => {
+    async function fetchServices() {
+      try {
+        const response = await fetch(
+          'http://localhost:5000/api/services'
+        )
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch services.')
+        }
+
+        const data = await response.json()
+
+        setServices(data.services)
+        setServicesError('')
+      } catch (error) {
+        console.error('Error fetching booking services:', error)
+
+        setServicesError(
+          'Unable to load services. Please try again later.'
+        )
+      } finally {
+        setLoadingServices(false)
+      }
+    }
+
+    fetchServices()
+  }, [])
+
+  // Get the services available for the selected vehicle.
+  const availableServices = services.filter(
+    (item) => item.vehicle_type === vehicle
+  )
+
+  // Find the selected service and its price in PostgreSQL data.
+  const selectedService = services.find(
+    (item) =>
+      item.vehicle_type === vehicle &&
+      item.service_name === service
+  )
+
+  const selectedPrice = selectedService
+    ? Number(selectedService.price)
+    : null
+
   // Preselect a service when arriving from the Services page.
   useEffect(() => {
-    const requestedService = searchParams.get('service')
-    const availableServices = Object.keys(prices.Car)
+    if (loadingServices || servicesError) {
+      return
+    }
 
-    if (availableServices.includes(requestedService)) {
-      setService(requestedService)
+    const requestedService = searchParams.get('service')
+
+    const matchingService = services.find(
+      (item) =>
+        item.vehicle_type === 'Car' &&
+        item.service_name === requestedService
+    )
+
+    if (matchingService) {
+      setVehicle('Car')
+      setService(matchingService.service_name)
     } else {
       setService('')
     }
-  }, [searchParams])
+  }, [searchParams, services, loadingServices, servicesError])
 
   // Automatically select Full Wash for motorcycles.
-  // Only depend on vehicle to prevent unnecessary effect loops.
   useEffect(() => {
-    if (vehicle === 'Motorcycle') {
-      setService('Full Wash')
+    if (vehicle === 'Motorcycle' && !loadingServices) {
+      const motorcycleFullWash = services.find(
+        (item) =>
+          item.vehicle_type === 'Motorcycle' &&
+          item.service_name === 'Full Wash'
+      )
+
+      setService(
+        motorcycleFullWash ? motorcycleFullWash.service_name : ''
+      )
     }
-  }, [vehicle])
-
-  const availableServices = Object.keys(prices[vehicle])
-
-  // Prevent undefined prices from being formatted during state changes.
-  const selectedPrice =
-    service && prices[vehicle][service] !== undefined
-      ? prices[vehicle][service]
-      : null
+  }, [vehicle, services, loadingServices])
 
   function showMessage(text, type = 'error') {
     setMessage(text)
     setMessageType(type)
   }
 
+  // Change vehicle and ensure the selected service is available.
   function handleVehicleChange(e) {
     const newVehicle = e.target.value
 
     setVehicle(newVehicle)
+    setMessage('')
 
-    // Update the service immediately when changing vehicle.
     if (newVehicle === 'Motorcycle') {
-      setService('Full Wash')
-    } else if (service && prices[newVehicle][service] === undefined) {
-      setService('')
+      const motorcycleFullWash = services.find(
+        (item) =>
+          item.vehicle_type === 'Motorcycle' &&
+          item.service_name === 'Full Wash'
+      )
+
+      setService(
+        motorcycleFullWash ? motorcycleFullWash.service_name : ''
+      )
+
+      return
     }
 
-    setMessage('')
+    const currentServiceAvailable = services.some(
+      (item) =>
+        item.vehicle_type === newVehicle &&
+        item.service_name === service
+    )
+
+    if (!currentServiceAvailable) {
+      setService('')
+    }
   }
 
   function handleServiceChange(e) {
@@ -216,8 +273,27 @@ function Booking() {
   function handleSubmit(e) {
     e.preventDefault()
 
-    // Confirm that the selected service is available.
-    if (prices[vehicle][service] === undefined) {
+    // Ensure services have loaded successfully.
+    if (loadingServices) {
+      showMessage('Please wait while our services load.')
+      return
+    }
+
+    if (servicesError) {
+      showMessage(
+        'Services could not be loaded. Please refresh the page and try again.'
+      )
+      return
+    }
+
+    // Confirm that the selected service exists in the database data.
+    const validService = services.find(
+      (item) =>
+        item.vehicle_type === vehicle &&
+        item.service_name === service
+    )
+
+    if (!validService) {
       showMessage('Please select a valid wash service.')
       return
     }
@@ -280,6 +356,22 @@ function Booking() {
           <p className="mb-8 text-gray-500">
             Fill in your details to arrange your vehicle wash.
           </p>
+
+          {/* Service loading and error messages */}
+          {loadingServices && (
+            <p className="mb-6 rounded-lg bg-blue-50 p-4 text-sm text-blue-700">
+              Loading available services and prices...
+            </p>
+          )}
+
+          {servicesError && (
+            <p
+              role="alert"
+              className="mb-6 rounded-lg bg-red-50 p-4 text-sm text-red-700"
+            >
+              {servicesError}
+            </p>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
 
@@ -352,12 +444,16 @@ function Booking() {
                 onChange={handleServiceChange}
                 className={inputStyle}
                 required
+                disabled={loadingServices || Boolean(servicesError)}
               >
                 <option value="">Choose a wash service</option>
 
-                {availableServices.map((serviceName) => (
-                  <option key={serviceName} value={serviceName}>
-                    {serviceName}
+                {availableServices.map((item) => (
+                  <option
+                    key={item.service_id}
+                    value={item.service_name}
+                  >
+                    {item.service_name} — {formatPrice(item.price)}
                   </option>
                 ))}
               </select>
@@ -452,7 +548,8 @@ function Booking() {
 
             <button
               type="submit"
-              className="w-full rounded-lg bg-blue-600 px-6 py-4 font-semibold text-white transition hover:bg-blue-700"
+              disabled={loadingServices || Boolean(servicesError)}
+              className="w-full rounded-lg bg-blue-600 px-6 py-4 font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
               Submit Booking
             </button>
@@ -544,4 +641,3 @@ function Booking() {
 }
 
 export default Booking
-
