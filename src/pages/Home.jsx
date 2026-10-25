@@ -2,7 +2,7 @@ import { CarFront, Sparkles, Droplets, Check } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
 import carwashHero from '../assets/carwash-hero.jpg'
-import detailing from '../assets/detailing.jpg'
+import detailing from '../assets/Detailing.jpg'
 
 function Home() {
   return (
