@@ -269,56 +269,89 @@ function Booking() {
 
     setMessage('')
   }
+async function handleSubmit(e) {
+  e.preventDefault()
 
-  function handleSubmit(e) {
-    e.preventDefault()
+  // 1. Check that services have loaded.
+  if (loadingServices) {
+    showMessage('Please wait while our services load.')
+    return
+  }
 
-    // Ensure services have loaded successfully.
-    if (loadingServices) {
-      showMessage('Please wait while our services load.')
-      return
-    }
-
-    if (servicesError) {
-      showMessage(
-        'Services could not be loaded. Please refresh the page and try again.'
-      )
-      return
-    }
-
-    // Confirm that the selected service exists in the database data.
-    const validService = services.find(
-      (item) =>
-        item.vehicle_type === vehicle &&
-        item.service_name === service
-    )
-
-    if (!validService) {
-      showMessage('Please select a valid wash service.')
-      return
-    }
-
-    // Check the date.
-    if (!isBookingDateAllowed(formData.date)) {
-      showMessage(
-        'Please choose a valid date. We are closed on Saturdays and do not accept bookings for past dates.'
-      )
-      return
-    }
-
-    // Check the time.
-    if (!isBookingTimeAllowed(formData.time)) {
-      showMessage(
-        'Please choose a time between 8:30 AM and 7:30 PM.'
-      )
-      return
-    }
-
+  if (servicesError) {
     showMessage(
-      'Your details are valid, but booking submission has not been connected yet. Your booking has NOT been sent or saved.',
+      'Services could not be loaded. Please refresh the page and try again.'
+    )
+    return
+  }
+
+  // 2. Confirm that the selected service exists.
+  const validService = services.find(
+    (item) =>
+      item.vehicle_type === vehicle &&
+      item.service_name === service
+  )
+
+  if (!validService) {
+    showMessage('Please select a valid wash service.')
+    return
+  }
+
+  // 3. Validate the booking date.
+  if (!isBookingDateAllowed(formData.date)) {
+    showMessage(
+      'Please choose a valid date. We are closed on Saturdays and do not accept bookings for past dates.'
+    )
+    return
+  }
+
+  // 4. Validate the booking time.
+  if (!isBookingTimeAllowed(formData.time)) {
+    showMessage(
+      'Please choose a time between 8:30 AM and 7:30 PM.'
+    )
+    return
+  }
+
+  // 5. Send the booking details to the backend.
+  try {
+    const response = await fetch('http://localhost:5000/api/bookings', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        fullName: formData.fullName,
+        phone: formData.phone,
+        date: formData.date,
+        time: formData.time,
+        vehicle: vehicle,
+        service: service,
+        notes: formData.notes,
+      }),
+    })
+
+    const data = await response.json()
+
+    if (!response.ok) {
+      throw new Error(data.message || 'Failed to submit your booking.')
+    }
+
+    // 6. Display the confirmation returned by the backend.
+    showMessage(
+      `Booking submitted successfully! Your booking reference is #${data.booking.booking_id}.`,
       'success'
     )
+
+  } catch (error) {
+    console.error('Booking submission error:', error)
+
+    showMessage(
+      error.message ||
+      'Unable to submit your booking. Please try again.'
+    )
   }
+}
 
   const inputStyle =
     'w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-gray-900 outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100'
