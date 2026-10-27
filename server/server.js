@@ -106,6 +106,92 @@ function getKenyaDateTime() {
   };
 }
 
+
+// Administrator login
+app.post('/api/admin/login', adminLoginLimiter, async (req, res, next) => {
+  const { email, password } = req.body;
+
+  // Validate the submitted credentials.
+  if (
+    typeof email !== 'string' ||
+    !email.trim() ||
+    typeof password !== 'string' ||
+    !password
+  ) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'Email and password are required.',
+    });
+  }
+
+  try {
+    const normalizedEmail = email.trim().toLowerCase();
+
+    // Find the active administrator account.
+    const result = await pool.query(
+      `SELECT admin_id, full_name, email, password_hash
+       FROM admin_users
+       WHERE email = $1
+         AND is_active = TRUE
+       LIMIT 1`,
+      [normalizedEmail]
+    );
+
+    const bcrypt = require('bcrypt');
+
+    // Use a generic message to avoid revealing whether an email exists.
+    if (
+      result.rows.length === 0 ||
+      !(await bcrypt.compare(
+        password,
+        result.rows[0].password_hash
+      ))
+    ) {
+      return res.status(401).json({
+        status: 'error',
+        message: 'Invalid email or password.',
+      });
+    }
+
+    const admin = result.rows[0];
+
+    // Regenerate the session after authentication to prevent
+    // session fixation.
+    req.session.regenerate((sessionError) => {
+      if (sessionError) {
+        return next(sessionError);
+      }
+
+      req.session.adminId = admin.admin_id;
+
+      req.session.save((saveError) => {
+        if (saveError) {
+          return next(saveError);
+        }
+
+        return res.status(200).json({
+          status: 'success',
+          message: 'Login successful.',
+          admin: {
+            id: admin.admin_id,
+            fullName: admin.full_name,
+            email: admin.email,
+          },
+        });
+      });
+    });
+  } catch (error) {
+    console.error('Administrator login failed:', error.message);
+
+    return res.status(500).json({
+      status: 'error',
+      message: 'Unable to log in right now. Please try again.',
+    });
+  }
+});
+
+
+
 // Home route
 app.get('/', (req, res) => {
   res.json({
