@@ -53,6 +53,33 @@ app.use(
   })
 );
 
+
+// Limit repeated administrator login attempts.
+const adminLoginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  limit: 10,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  message: {
+    status: 'error',
+    message: 'Too many login attempts. Please try again later.',
+  },
+});
+
+// Protect administrator-only routes.
+function requireAdmin(req, res, next) {
+  if (!req.session || !req.session.adminId) {
+    return res.status(401).json({
+      status: 'error',
+      message: 'Please log in to access this resource.',
+    });
+  }
+
+  next();
+}
+
+
+
 // Get current date and time in Kenya
 function getKenyaDateTime() {
   const parts = new Intl.DateTimeFormat('en-GB', {
