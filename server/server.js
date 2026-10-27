@@ -1,6 +1,10 @@
 
 const express = require('express');
 const cors = require('cors');
+const session = require('express-session');
+const pgSession = require('connect-pg-simple')(session);
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
 const pool = require('./config/db');
@@ -14,8 +18,40 @@ const OPEN_TIME = '08:30';
 const CLOSE_TIME = '19:30';
 
 // Middleware
-app.use(cors());
+// Security headers
+app.use(helmet());
+
+// Allow requests from the frontend
+app.use(
+  cors({
+    origin: process.env.CLIENT_URL || 'http://localhost:5173',
+    credentials: true,
+  })
+);
+
+// Parse JSON request bodies
 app.use(express.json());
+
+// PostgreSQL-backed administrator sessions
+app.use(
+  session({
+    store: new pgSession({
+      pool,
+      tableName: 'admin_sessions',
+      createTableIfMissing: true,
+    }),
+    name: 'express_car_wash_sid',
+    secret: process.env.SESSION_SECRET,
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 1000 * 60 * 60 * 8,
+    },
+  })
+);
 
 // Get current date and time in Kenya
 function getKenyaDateTime() {
