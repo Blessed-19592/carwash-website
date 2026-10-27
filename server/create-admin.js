@@ -30,13 +30,9 @@ async function createAdmin() {
       .trim()
       .toLowerCase();
 
-    const password = prompt('Create a password: ', {
-      echo: '',
-    });
+     const password = prompt.hide('Create a password: ');
 
-    const confirmPassword = prompt('Confirm password: ', {
-      echo: '',
-    });
+const confirmPassword = prompt.hide('Confirm password: ');
 
     // Validate the inputs.
     if (!fullName || fullName.length > 100) {
