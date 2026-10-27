@@ -8,9 +8,40 @@ const pool = require('./config/db');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Business settings
+const TIME_ZONE = 'Africa/Nairobi';
+const OPEN_TIME = '08:30';
+const CLOSE_TIME = '19:30';
+
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+// Get current date and time in Kenya
+function getKenyaDateTime() {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(new Date());
+
+  const values = {};
+
+  for (const part of parts) {
+    if (part.type !== 'literal') {
+      values[part.type] = part.value;
+    }
+  }
+
+  return {
+    date: `${values.year}-${values.month}-${values.day}`,
+    time: `${values.hour}:${values.minute}`,
+  };
+}
 
 // Home route
 app.get('/', (req, res) => {
@@ -27,7 +58,7 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Get active services from PostgreSQL
+// Get active services
 app.get('/api/services', async (req, res) => {
   try {
     const result = await pool.query(
@@ -54,8 +85,15 @@ app.get('/api/services', async (req, res) => {
 
 // Create a booking
 app.post('/api/bookings', async (req, res) => {
-  const { fullName, phone, date, time, vehicle, service, notes } =
-    req.body;
+  const {
+    fullName,
+    phone,
+    date,
+    time,
+    vehicle,
+    service,
+    notes,
+  } = req.body;
 
   // 1. Validate required fields
   if (
@@ -63,10 +101,12 @@ app.post('/api/bookings', async (req, res) => {
     !fullName.trim() ||
     typeof phone !== 'string' ||
     !phone.trim() ||
-    !date ||
-    !time ||
-    !vehicle ||
-    !service
+    typeof date !== 'string' ||
+    typeof time !== 'string' ||
+    typeof vehicle !== 'string' ||
+    !vehicle.trim() ||
+    typeof service !== 'string' ||
+    !service.trim()
   ) {
     return res.status(400).json({
       status: 'error',
@@ -74,7 +114,72 @@ app.post('/api/bookings', async (req, res) => {
     });
   }
 
-  // 2. Validate Kenyan mobile phone number format
+  // 2. Validate the date format
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'Please provide a valid booking date.',
+    });
+  }
+
+  // Check that the date actually exists
+  const [year, month, day] = date.split('-').map(Number);
+  const selectedDate = new Date(Date.UTC(year, month - 1, day));
+
+  if (
+    selectedDate.getUTCFullYear() !== year ||
+    selectedDate.getUTCMonth() !== month - 1 ||
+    selectedDate.getUTCDate() !== day
+  ) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'The selected booking date is invalid.',
+    });
+  }
+
+  // 3. Validate the time format
+  if (!/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(time)) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'Please provide a valid booking time.',
+    });
+  }
+
+  // 4. Reject Saturdays
+  // JavaScript: Sunday = 0, Saturday = 6
+  if (selectedDate.getUTCDay() === 6) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'We are closed on Saturdays. Please select another day.',
+    });
+  }
+
+  // 5. Check business hours
+  if (time < OPEN_TIME || time > CLOSE_TIME) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'Bookings must be between 8:30 AM and 7:30 PM.',
+    });
+  }
+
+  // 6. Reject past dates and times using Kenya's local time
+  const now = getKenyaDateTime();
+
+  if (date < now.date) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'You cannot book a date that has already passed.',
+    });
+  }
+
+  if (date === now.date && time <= now.time) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'Please select a future booking time.',
+    });
+  }
+
+  // 7. Validate Kenyan mobile number
   const normalizedPhone = phone.trim().replace(/[\s-]/g, '');
 
   const kenyanPhonePattern = /^(?:\+254|254|0)(?:7\d{8}|1\d{8})$/;
@@ -86,31 +191,33 @@ app.post('/api/bookings', async (req, res) => {
     });
   }
 
-  // 3. Validate optional notes
-  if (notes !== undefined && notes !== null && typeof notes !== 'string') {
+  // 8. Validate optional notes
+  if (
+    notes !== undefined &&
+    notes !== null &&
+    typeof notes !== 'string'
+  ) {
     return res.status(400).json({
       status: 'error',
       message: 'Booking notes must be text.',
     });
   }
 
-  // 4. Connect to PostgreSQL
   let client;
 
   try {
     client = await pool.connect();
 
-    // Begin transaction
     await client.query('BEGIN');
 
-    // 5. Find the selected active service and its database price
+    // 9. Find the selected active service and its database price
     const serviceResult = await client.query(
       `SELECT service_id, price
        FROM services
        WHERE vehicle_type = $1
          AND service_name = $2
          AND is_active = TRUE`,
-      [vehicle, service]
+      [vehicle.trim(), service.trim()]
     );
 
     if (serviceResult.rows.length === 0) {
@@ -125,7 +232,15 @@ app.post('/api/bookings', async (req, res) => {
     const selectedService = serviceResult.rows[0];
     const amount = selectedService.price;
 
-    // 6. Find an existing customer by normalized phone number
+    // 10. Prevent simultaneous requests from creating duplicate
+    // customer records for the same normalized phone number.
+    // This lock applies only to requests using the same phone number.
+    await client.query(
+      'SELECT pg_advisory_xact_lock(hashtext($1))',
+      [normalizedPhone]
+    );
+
+    // Find existing customer
     let customerResult = await client.query(
       `SELECT customer_id
        FROM customers
@@ -137,7 +252,6 @@ app.post('/api/bookings', async (req, res) => {
     let customerId;
 
     if (customerResult.rows.length > 0) {
-      // Reuse the existing customer
       customerId = customerResult.rows[0].customer_id;
 
       await client.query(
@@ -147,7 +261,6 @@ app.post('/api/bookings', async (req, res) => {
         [fullName.trim(), customerId]
       );
     } else {
-      // Create a new customer
       customerResult = await client.query(
         `INSERT INTO customers (full_name, phone)
          VALUES ($1, $2)
@@ -158,7 +271,8 @@ app.post('/api/bookings', async (req, res) => {
       customerId = customerResult.rows[0].customer_id;
     }
 
-    // 7. Save the booking
+    // 11. Save the booking.
+    // Different customers can book the same date and time.
     const bookingResult = await client.query(
       `INSERT INTO bookings (
          customer_id,
@@ -185,22 +299,23 @@ app.post('/api/bookings', async (req, res) => {
       ]
     );
 
-    // 8. Commit the transaction
     await client.query('COMMIT');
 
-    // 9. Return the booking confirmation
+    // 12. Return confirmation
     return res.status(201).json({
       status: 'success',
       message: 'Your booking has been submitted successfully!',
       booking: bookingResult.rows[0],
     });
   } catch (error) {
-    // Roll back only if a transaction was started
     if (client) {
       try {
         await client.query('ROLLBACK');
       } catch (rollbackError) {
-        console.error('Transaction rollback failed:', rollbackError.message);
+        console.error(
+          'Transaction rollback failed:',
+          rollbackError.message
+        );
       }
     }
 
@@ -219,6 +334,8 @@ app.post('/api/bookings', async (req, res) => {
 
 // Start server
 app.listen(PORT, () => {
-  console.log(`Express Car Wash API running at http://localhost:${PORT}`);
+  console.log(
+    `Express Car Wash API running at http://localhost:${PORT}`
+  );
 });
 
