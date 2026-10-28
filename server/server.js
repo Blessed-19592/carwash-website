@@ -710,35 +710,150 @@ app.post(
 
 
 // Get dashboard statistics (administrator only).
+
+// Get dashboard statistics and financial metrics.
+// Administrator access required.
 app.get('/api/admin/dashboard-stats', requireAdmin, async (req, res) => {
   try {
-    const result = await pool.query(
-      `SELECT
-         COUNT(*)::INTEGER AS total_bookings,
+    const result = await pool.query(`
+      WITH booking_stats AS (
+        SELECT
+          COUNT(*)::INTEGER AS total_bookings,
 
-         COUNT(*) FILTER (
-           WHERE LOWER(status) = 'pending'
-         )::INTEGER AS pending_bookings,
+          COUNT(*) FILTER (
+            WHERE LOWER(status) = 'pending'
+          )::INTEGER AS pending_bookings,
 
-         COUNT(*) FILTER (
-           WHERE LOWER(status) = 'confirmed'
-         )::INTEGER AS confirmed_bookings,
+          COUNT(*) FILTER (
+            WHERE LOWER(status) = 'confirmed'
+          )::INTEGER AS confirmed_bookings,
 
-         COUNT(*) FILTER (
-           WHERE LOWER(status) = 'completed'
-         )::INTEGER AS completed_bookings,
+          COUNT(*) FILTER (
+            WHERE LOWER(status) = 'completed'
+          )::INTEGER AS completed_bookings,
 
-         COUNT(*) FILTER (
-           WHERE LOWER(status) = 'cancelled'
-         )::INTEGER AS cancelled_bookings,
+          COUNT(*) FILTER (
+            WHERE LOWER(status) = 'cancelled'
+          )::INTEGER AS cancelled_bookings,
 
-         COUNT(*) FILTER (
-           WHERE booking_date =
-             (CURRENT_TIMESTAMP AT TIME ZONE 'Africa/Nairobi')::DATE
-         )::INTEGER AS todays_bookings
+          COUNT(*) FILTER (
+            WHERE LOWER(status) = 'no_show'
+          )::INTEGER AS no_show_bookings,
 
-       FROM bookings`
-    );
+          COUNT(*) FILTER (
+            WHERE booking_date =
+              (CURRENT_TIMESTAMP AT TIME ZONE 'Africa/Nairobi')::DATE
+          )::INTEGER AS todays_bookings,
+
+          COALESCE(
+            SUM(amount) FILTER (
+              WHERE LOWER(status) <> 'cancelled'
+            ),
+            0
+          ) AS potential_revenue,
+
+          COALESCE(
+            SUM(amount) FILTER (
+              WHERE LOWER(status) = 'no_show'
+            ),
+            0
+          ) AS estimated_no_show_loss,
+
+          COALESCE(
+            SUM(amount) FILTER (
+              WHERE LOWER(status) = 'completed'
+            ),
+            0
+          ) AS completed_service_value,
+
+          COALESCE(
+            SUM(amount) FILTER (
+              WHERE booking_date =
+                (CURRENT_TIMESTAMP AT TIME ZONE 'Africa/Nairobi')::DATE
+                AND LOWER(status) <> 'cancelled'
+            ),
+            0
+          ) AS todays_potential_revenue
+
+        FROM bookings
+      ),
+
+      payment_stats AS (
+        SELECT
+          COALESCE(
+            SUM(amount),
+            0
+          ) AS actual_revenue,
+
+          COALESCE(
+            SUM(amount) FILTER (
+              WHERE (paid_at AT TIME ZONE 'Africa/Nairobi')::DATE =
+                (CURRENT_TIMESTAMP AT TIME ZONE 'Africa/Nairobi')::DATE
+            ),
+            0
+          ) AS todays_revenue,
+
+          COALESCE(
+            SUM(amount) FILTER (
+              WHERE paid_at >=
+                DATE_TRUNC(
+                  'month',
+                  CURRENT_TIMESTAMP AT TIME ZONE 'Africa/Nairobi'
+                ) AT TIME ZONE 'Africa/Nairobi'
+                AND paid_at <
+                (
+                  DATE_TRUNC(
+                    'month',
+                    CURRENT_TIMESTAMP AT TIME ZONE 'Africa/Nairobi'
+                  ) + INTERVAL '1 month'
+                ) AT TIME ZONE 'Africa/Nairobi'
+            ),
+            0
+          ) AS monthly_revenue
+
+        FROM payments
+        WHERE LOWER(status) = 'completed'
+          AND paid_at IS NOT NULL
+      ),
+
+      outstanding_stats AS (
+        SELECT
+          COALESCE(
+            SUM(
+              GREATEST(
+                b.amount - COALESCE(p.total_paid, 0),
+                0
+              )
+            ),
+            0
+          ) AS unpaid_completed_services
+
+        FROM bookings b
+
+        LEFT JOIN (
+          SELECT
+            booking_id,
+            SUM(amount) AS total_paid
+          FROM payments
+          WHERE LOWER(status) = 'completed'
+            AND paid_at IS NOT NULL
+          GROUP BY booking_id
+        ) p ON p.booking_id = b.booking_id
+
+        WHERE LOWER(b.status) = 'completed'
+      )
+
+      SELECT
+        bs.*,
+        ps.actual_revenue,
+        ps.todays_revenue,
+        ps.monthly_revenue,
+        os.unpaid_completed_services
+
+      FROM booking_stats bs
+      CROSS JOIN payment_stats ps
+      CROSS JOIN outstanding_stats os
+    `);
 
     return res.json({
       status: 'success',
