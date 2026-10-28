@@ -522,6 +522,7 @@ app.patch(
   }
 );
 
+
 // Record a payment received by the business.
 // Administrator access required.
 app.post(
@@ -553,7 +554,6 @@ app.post(
     }
 
     const paymentAmount = Number(amountString);
-
     const allowedMethods = ['cash', 'mpesa', 'card', 'other'];
 
     if (
@@ -589,7 +589,7 @@ app.post(
       await client.query('BEGIN');
       transactionStarted = true;
 
-      // Lock this booking to prevent concurrent payment over-recording.
+      // Lock the booking to prevent concurrent payment over-recording.
       const bookingResult = await client.query(
         `SELECT booking_id, amount, status
          FROM bookings
@@ -617,38 +617,58 @@ app.post(
 
         return res.status(400).json({
           status: 'error',
-          message: 'Payments cannot be recorded for cancelled or no-show bookings.',
+          message:
+            'Payments cannot be recorded for cancelled or no-show bookings.',
         });
       }
 
-      // Only payments recorded as completed and actually received count.
+      // Only successful payments with a paid_at timestamp count as received.
       const totalsResult = await client.query(
         `SELECT COALESCE(SUM(amount), 0) AS total_paid
          FROM payments
          WHERE booking_id = $1
-           AND LOWER(status) = 'completed'
+           AND LOWER(status) = 'successful'
            AND paid_at IS NOT NULL`,
         [bookingId]
       );
 
       const bookingAmount = Number(booking.amount);
-      const totalPaid = Number(totalsResult.rows[0].total_paid);
-      const remainingBalance = Math.max(0, bookingAmount - totalPaid);
+const totalPaid = Number(totalsResult.rows[0].total_paid);
 
-      if (paymentAmount > remainingBalance + 0.000001) {
-        await client.query('ROLLBACK');
-        transactionStarted = false;
+const remainingBalance = Math.max(
+  0,
+  Math.round((bookingAmount - totalPaid) * 100) / 100
+);
 
-        return res.status(400).json({
-          status: 'error',
-          message: 'Payment exceeds the remaining balance.',
-          booking_amount: bookingAmount,
-          total_paid: totalPaid,
-          remaining_balance: remainingBalance,
-        });
-      }
+// Reject payments when the booking has already been fully paid.
+if (remainingBalance <= 0) {
+  await client.query('ROLLBACK');
+  transactionStarted = false;
 
-      // Record money that the owner has confirmed receiving.
+  return res.status(400).json({
+    status: 'error',
+    message: 'This booking has already been fully paid.',
+    booking_amount: bookingAmount,
+    total_paid: totalPaid,
+    remaining_balance: 0,
+  });
+}
+
+// Reject payments exceeding the outstanding balance.
+if (paymentAmount > remainingBalance) {
+  await client.query('ROLLBACK');
+  transactionStarted = false;
+
+  return res.status(400).json({
+    status: 'error',
+    message: 'Payment exceeds the remaining balance.',
+    booking_amount: bookingAmount,
+    total_paid: totalPaid,
+    remaining_balance: remainingBalance,
+  });
+}
+
+      // Record money the owner has confirmed receiving.
       const paymentResult = await client.query(
         `INSERT INTO payments (
            booking_id,
@@ -659,7 +679,12 @@ app.post(
            paid_at,
            created_at
          )
-         VALUES ($1, $2, $3, $4, 'completed', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+         VALUES (
+           $1, $2, $3, $4,
+           'successful',
+           CURRENT_TIMESTAMP,
+           CURRENT_TIMESTAMP
+         )
          RETURNING
            payment_id,
            booking_id,
@@ -709,7 +734,7 @@ app.post(
 );
 
 
-// Get dashboard statistics (administrator only).
+
 
 // Get dashboard statistics and financial metrics.
 // Administrator access required.
@@ -812,7 +837,7 @@ app.get('/api/admin/dashboard-stats', requireAdmin, async (req, res) => {
           ) AS monthly_revenue
 
         FROM payments
-        WHERE LOWER(status) = 'completed'
+        WHERE LOWER(status) = 'successful'
           AND paid_at IS NOT NULL
       ),
 
@@ -835,7 +860,7 @@ app.get('/api/admin/dashboard-stats', requireAdmin, async (req, res) => {
             booking_id,
             SUM(amount) AS total_paid
           FROM payments
-          WHERE LOWER(status) = 'completed'
+          WHERE LOWER(status) = 'successful'
             AND paid_at IS NOT NULL
           GROUP BY booking_id
         ) p ON p.booking_id = b.booking_id
@@ -859,8 +884,12 @@ app.get('/api/admin/dashboard-stats', requireAdmin, async (req, res) => {
       status: 'success',
       stats: result.rows[0],
     });
+
   } catch (error) {
-    console.error('Error fetching dashboard statistics:', error.message);
+    console.error(
+      'Error fetching dashboard statistics:',
+      error.message
+    );
 
     return res.status(500).json({
       status: 'error',
