@@ -191,6 +191,310 @@ app.post('/api/admin/login', adminLoginLimiter, async (req, res, next) => {
 });
 
 
+// Check whether the administrator is logged in.
+app.get('/api/admin/me', requireAdmin, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT admin_id, full_name, email
+       FROM admin_users
+       WHERE admin_id = $1
+         AND is_active = TRUE
+       LIMIT 1`,
+      [req.session.adminId]
+    );
+
+    if (result.rows.length === 0) {
+      return req.session.destroy(() => {
+        res.clearCookie('express_car_wash_sid', {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+        });
+
+        return res.status(401).json({
+          status: 'error',
+          message: 'Administrator account is unavailable. Please log in again.',
+        });
+      });
+    }
+
+    const admin = result.rows[0];
+
+    return res.json({
+      status: 'success',
+      admin: {
+        id: admin.admin_id,
+        fullName: admin.full_name,
+        email: admin.email,
+      },
+    });
+  } catch (error) {
+    console.error('Administrator session check failed:', error.message);
+
+    return res.status(500).json({
+      status: 'error',
+      message: 'Unable to verify your session.',
+    });
+  }
+});
+
+// Administrator logout.
+app.post('/api/admin/logout', requireAdmin, (req, res, next) => {
+  req.session.destroy((error) => {
+    if (error) {
+      console.error('Administrator logout failed:', error.message);
+
+      return next(error);
+    }
+
+    res.clearCookie('express_car_wash_sid', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+    });
+
+    return res.json({
+      status: 'success',
+      message: 'Logged out successfully.',
+    });
+  });
+});
+
+
+// Get bookings for the authenticated administrator.
+app.get('/api/admin/bookings', requireAdmin, async (req, res) => {
+  try {
+    const { date, status, search } = req.query;
+
+    // Validate optional filters.
+    if (date !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Please provide a valid date in YYYY-MM-DD format.',
+      });
+    }
+
+    const allowedStatuses = [
+      'pending',
+      'confirmed',
+      'completed',
+      'cancelled',
+    ];
+
+    if (
+      status !== undefined &&
+      (typeof status !== 'string' ||
+        !allowedStatuses.includes(status.toLowerCase()))
+    ) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Invalid booking status filter.',
+      });
+    }
+
+    if (
+      search !== undefined &&
+      (typeof search !== 'string' || search.trim().length > 100)
+    ) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Search must be 100 characters or fewer.',
+      });
+    }
+
+    const conditions = [];
+    const values = [];
+
+    if (date) {
+      values.push(date);
+      conditions.push(`b.booking_date = $${values.length}::date`);
+    }
+
+    if (status) {
+      values.push(status.toLowerCase());
+      conditions.push(`LOWER(b.status) = $${values.length}`);
+    }
+
+    if (search && search.trim()) {
+      values.push(`%${search.trim()}%`);
+      const searchParameter = `$${values.length}`;
+
+      conditions.push(`(
+        c.full_name ILIKE ${searchParameter}
+        OR c.phone ILIKE ${searchParameter}
+        OR s.service_name ILIKE ${searchParameter}
+        OR s.vehicle_type ILIKE ${searchParameter}
+      )`);
+    }
+
+    const whereClause = conditions.length
+      ? `WHERE ${conditions.join(' AND ')}`
+      : '';
+
+    const result = await pool.query(
+      `SELECT
+         b.booking_id,
+         b.booking_date,
+         b.booking_time,
+         b.status,
+         b.amount,
+         b.notes,
+         b.created_at,
+         c.full_name AS customer_name,
+         c.phone AS customer_phone,
+         s.vehicle_type,
+         s.service_name
+       FROM bookings b
+       INNER JOIN customers c
+         ON b.customer_id = c.customer_id
+       INNER JOIN services s
+         ON b.service_id = s.service_id
+       ${whereClause}
+       ORDER BY
+         b.booking_date DESC,
+         b.booking_time DESC,
+         b.booking_id DESC
+       LIMIT 200`,
+      values
+    );
+
+    return res.json({
+      status: 'success',
+      count: result.rows.length,
+      bookings: result.rows,
+    });
+  } catch (error) {
+    console.error('Error fetching admin bookings:', error.message);
+
+    return res.status(500).json({
+      status: 'error',
+      message: 'Unable to retrieve bookings.',
+    });
+  }
+});
+
+
+// Update a booking's status (administrator only).
+app.patch(
+  '/api/admin/bookings/:id/status',
+  requireAdmin,
+  async (req, res) => {
+    const bookingId = Number(req.params.id);
+    const { status } = req.body;
+
+    // Validate the booking ID.
+    if (
+      !Number.isSafeInteger(bookingId) ||
+      bookingId <= 0
+    ) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Invalid booking ID.',
+      });
+    }
+
+    // Only allow recognized booking statuses.
+    const allowedStatuses = [
+      'pending',
+      'confirmed',
+      'completed',
+      'cancelled',
+    ];
+
+    if (
+      typeof status !== 'string' ||
+      !allowedStatuses.includes(status.toLowerCase())
+    ) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Please provide a valid booking status.',
+      });
+    }
+
+    const newStatus = status.toLowerCase();
+
+    try {
+      const result = await pool.query(
+        `UPDATE bookings
+         SET status = $1
+         WHERE booking_id = $2
+         RETURNING
+           booking_id,
+           booking_date,
+           booking_time,
+           status,
+           amount`,
+        [newStatus, bookingId]
+      );
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({
+          status: 'error',
+          message: 'Booking not found.',
+        });
+      }
+
+      return res.json({
+        status: 'success',
+        message: 'Booking status updated successfully.',
+        booking: result.rows[0],
+      });
+    } catch (error) {
+      console.error('Error updating booking status:', error.message);
+
+      return res.status(500).json({
+        status: 'error',
+        message: 'Unable to update the booking status.',
+      });
+    }
+  }
+);
+
+
+// Get dashboard statistics (administrator only).
+app.get('/api/admin/dashboard-stats', requireAdmin, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT
+         COUNT(*)::INTEGER AS total_bookings,
+
+         COUNT(*) FILTER (
+           WHERE LOWER(status) = 'pending'
+         )::INTEGER AS pending_bookings,
+
+         COUNT(*) FILTER (
+           WHERE LOWER(status) = 'confirmed'
+         )::INTEGER AS confirmed_bookings,
+
+         COUNT(*) FILTER (
+           WHERE LOWER(status) = 'completed'
+         )::INTEGER AS completed_bookings,
+
+         COUNT(*) FILTER (
+           WHERE LOWER(status) = 'cancelled'
+         )::INTEGER AS cancelled_bookings,
+
+         COUNT(*) FILTER (
+           WHERE booking_date =
+             (CURRENT_TIMESTAMP AT TIME ZONE 'Africa/Nairobi')::DATE
+         )::INTEGER AS todays_bookings
+
+       FROM bookings`
+    );
+
+    return res.json({
+      status: 'success',
+      stats: result.rows[0],
+    });
+  } catch (error) {
+    console.error('Error fetching dashboard statistics:', error.message);
+
+    return res.status(500).json({
+      status: 'error',
+      message: 'Unable to retrieve dashboard statistics.',
+    });
+  }
+});
 
 // Home route
 app.get('/', (req, res) => {
