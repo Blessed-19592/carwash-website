@@ -261,24 +261,32 @@ app.post('/api/admin/logout', requireAdmin, (req, res, next) => {
 });
 
 
-// Get bookings for the authenticated administrator.
+
+// Get bookings for the authenticated administrator,
+// including total payments received and outstanding balances.
 app.get('/api/admin/bookings', requireAdmin, async (req, res) => {
   try {
     const { date, status, search } = req.query;
 
-    // Validate optional filters.
-    if (date !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    // Validate optional date filter.
+    if (
+      date !== undefined &&
+      (typeof date !== 'string' ||
+        !/^\d{4}-\d{2}-\d{2}$/.test(date))
+    ) {
       return res.status(400).json({
         status: 'error',
         message: 'Please provide a valid date in YYYY-MM-DD format.',
       });
     }
 
+    // Validate optional booking status filter.
     const allowedStatuses = [
       'pending',
       'confirmed',
       'completed',
       'cancelled',
+      'no_show',
     ];
 
     if (
@@ -292,6 +300,7 @@ app.get('/api/admin/bookings', requireAdmin, async (req, res) => {
       });
     }
 
+    // Validate optional search filter.
     if (
       search !== undefined &&
       (typeof search !== 'string' || search.trim().length > 100)
@@ -340,20 +349,65 @@ app.get('/api/admin/bookings', requireAdmin, async (req, res) => {
          b.amount,
          b.notes,
          b.created_at,
+
          c.full_name AS customer_name,
          c.phone AS customer_phone,
+
          s.vehicle_type,
-         s.service_name
+         s.service_name,
+
+         COALESCE(p.total_paid, 0)::numeric AS total_paid,
+
+         GREATEST(
+           ROUND(
+             (b.amount - COALESCE(p.total_paid, 0))::numeric,
+             2
+           ),
+           0
+         ) AS remaining_balance,
+
+         CASE
+           WHEN GREATEST(
+             ROUND(
+               (b.amount - COALESCE(p.total_paid, 0))::numeric,
+               2
+             ),
+             0
+           ) = 0
+           THEN 'paid'
+
+           WHEN COALESCE(p.total_paid, 0) > 0
+           THEN 'partially_paid'
+
+           ELSE 'unpaid'
+         END AS payment_status
+
        FROM bookings b
+
        INNER JOIN customers c
          ON b.customer_id = c.customer_id
+
        INNER JOIN services s
          ON b.service_id = s.service_id
+
+       LEFT JOIN (
+         SELECT
+           booking_id,
+           SUM(amount) AS total_paid
+         FROM payments
+         WHERE LOWER(status) = 'successful'
+           AND paid_at IS NOT NULL
+         GROUP BY booking_id
+       ) p
+         ON p.booking_id = b.booking_id
+
        ${whereClause}
+
        ORDER BY
          b.booking_date DESC,
          b.booking_time DESC,
          b.booking_id DESC
+
        LIMIT 200`,
       values
     );
@@ -372,6 +426,7 @@ app.get('/api/admin/bookings', requireAdmin, async (req, res) => {
     });
   }
 });
+
 
 
 // Update a booking's status and record its history.
