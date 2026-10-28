@@ -522,6 +522,192 @@ app.patch(
   }
 );
 
+// Record a payment received by the business.
+// Administrator access required.
+app.post(
+  '/api/admin/bookings/:id/payments',
+  requireAdmin,
+  async (req, res) => {
+    const bookingId = Number(req.params.id);
+    const { amount, payment_method, transaction_reference } = req.body;
+
+    if (!Number.isSafeInteger(bookingId) || bookingId <= 0) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Invalid booking ID.',
+      });
+    }
+
+    // Accept a positive amount with no more than two decimal places.
+    const amountString = String(amount ?? '');
+
+    if (
+      !/^\d+(\.\d{1,2})?$/.test(amountString) ||
+      !Number.isFinite(Number(amountString)) ||
+      Number(amountString) <= 0
+    ) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Enter a valid payment amount greater than zero.',
+      });
+    }
+
+    const paymentAmount = Number(amountString);
+
+    const allowedMethods = ['cash', 'mpesa', 'card', 'other'];
+
+    if (
+      typeof payment_method !== 'string' ||
+      !allowedMethods.includes(payment_method.toLowerCase())
+    ) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Choose cash, M-PESA, card, or other.',
+      });
+    }
+
+    const method = payment_method.toLowerCase();
+
+    const reference =
+      transaction_reference == null
+        ? null
+        : String(transaction_reference).trim() || null;
+
+    if (reference && reference.length > 100) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Transaction reference cannot exceed 100 characters.',
+      });
+    }
+
+    let client;
+    let transactionStarted = false;
+
+    try {
+      client = await pool.connect();
+
+      await client.query('BEGIN');
+      transactionStarted = true;
+
+      // Lock this booking to prevent concurrent payment over-recording.
+      const bookingResult = await client.query(
+        `SELECT booking_id, amount, status
+         FROM bookings
+         WHERE booking_id = $1
+         FOR UPDATE`,
+        [bookingId]
+      );
+
+      if (bookingResult.rows.length === 0) {
+        await client.query('ROLLBACK');
+        transactionStarted = false;
+
+        return res.status(404).json({
+          status: 'error',
+          message: 'Booking not found.',
+        });
+      }
+
+      const booking = bookingResult.rows[0];
+      const bookingStatus = String(booking.status).toLowerCase();
+
+      if (['cancelled', 'no_show'].includes(bookingStatus)) {
+        await client.query('ROLLBACK');
+        transactionStarted = false;
+
+        return res.status(400).json({
+          status: 'error',
+          message: 'Payments cannot be recorded for cancelled or no-show bookings.',
+        });
+      }
+
+      // Only payments recorded as completed and actually received count.
+      const totalsResult = await client.query(
+        `SELECT COALESCE(SUM(amount), 0) AS total_paid
+         FROM payments
+         WHERE booking_id = $1
+           AND LOWER(status) = 'completed'
+           AND paid_at IS NOT NULL`,
+        [bookingId]
+      );
+
+      const bookingAmount = Number(booking.amount);
+      const totalPaid = Number(totalsResult.rows[0].total_paid);
+      const remainingBalance = Math.max(0, bookingAmount - totalPaid);
+
+      if (paymentAmount > remainingBalance + 0.000001) {
+        await client.query('ROLLBACK');
+        transactionStarted = false;
+
+        return res.status(400).json({
+          status: 'error',
+          message: 'Payment exceeds the remaining balance.',
+          booking_amount: bookingAmount,
+          total_paid: totalPaid,
+          remaining_balance: remainingBalance,
+        });
+      }
+
+      // Record money that the owner has confirmed receiving.
+      const paymentResult = await client.query(
+        `INSERT INTO payments (
+           booking_id,
+           amount,
+           payment_method,
+           transaction_reference,
+           status,
+           paid_at,
+           created_at
+         )
+         VALUES ($1, $2, $3, $4, 'completed', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+         RETURNING
+           payment_id,
+           booking_id,
+           amount,
+           payment_method,
+           transaction_reference,
+           status,
+           paid_at`,
+        [bookingId, paymentAmount, method, reference]
+      );
+
+      const updatedTotal = totalPaid + paymentAmount;
+      const updatedBalance = Math.max(0, bookingAmount - updatedTotal);
+
+      await client.query('COMMIT');
+      transactionStarted = false;
+
+      return res.status(201).json({
+        status: 'success',
+        message: 'Payment recorded successfully.',
+        payment: paymentResult.rows[0],
+        booking_amount: bookingAmount,
+        total_paid: updatedTotal,
+        remaining_balance: updatedBalance,
+        payment_status:
+          updatedBalance <= 0.000001
+            ? 'paid'
+            : 'partially_paid',
+      });
+    } catch (error) {
+      if (client && transactionStarted) {
+        await client.query('ROLLBACK').catch(() => {});
+      }
+
+      console.error('Error recording payment:', error.message);
+
+      return res.status(500).json({
+        status: 'error',
+        message: 'Unable to record the payment.',
+      });
+    } finally {
+      if (client) {
+        client.release();
+      }
+    }
+  }
+);
+
 
 // Get dashboard statistics (administrator only).
 app.get('/api/admin/dashboard-stats', requireAdmin, async (req, res) => {
