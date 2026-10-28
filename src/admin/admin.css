@@ -966,3 +966,70 @@ text-align: left;
 padding: 18px;
 }
 }
+
+
+
+/* Admin dashboard financial overview */
+
+.admin-dashboard-section {
+  margin-top: 32px;
+}
+
+.admin-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.admin-section-heading h3 {
+  margin: 4px 0 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.admin-financial-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border: 1px solid #dbeafe;
+  border-radius: 10px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.admin-financial-card {
+  min-width: 0;
+}
+
+.admin-money-value {
+  overflow-wrap: anywhere;
+  font-size: clamp(1.05rem, 1.7vw, 1.45rem) !important;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 640px) {
+  .admin-dashboard-section {
+    margin-top: 26px;
+  }
+
+  .admin-section-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .admin-financial-badge {
+    font-size: 0.75rem;
+  }
+
+  .admin-money-value {
+    font-size: 1rem !important;
+  }
+}
+
