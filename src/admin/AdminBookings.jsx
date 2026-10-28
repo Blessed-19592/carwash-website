@@ -1,4 +1,3 @@
-
 import { useCallback, useEffect, useState } from 'react';
 import {
   Search,
@@ -87,6 +86,35 @@ function formatAmount(amount) {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`;
+}
+
+function getTotalPaid(booking) {
+  const value = Number(booking?.total_paid ?? 0);
+  return Number.isFinite(value) ? Math.max(0, value) : 0;
+}
+
+function getRemainingBalance(booking) {
+  const explicitBalance = booking?.remaining_balance;
+
+  if (explicitBalance !== undefined && explicitBalance !== null) {
+    const value = Number(explicitBalance);
+    return Number.isFinite(value) ? Math.max(0, value) : 0;
+  }
+
+  const amount = Number(booking?.amount ?? 0);
+  return Math.max(0, amount - getTotalPaid(booking));
+}
+
+function getPaymentStatus(booking) {
+  if (getRemainingBalance(booking) <= 0) return 'paid';
+  if (getTotalPaid(booking) > 0) return 'partially_paid';
+  return 'unpaid';
+}
+
+function formatPaymentStatus(status) {
+  if (status === 'paid') return 'Paid';
+  if (status === 'partially_paid') return 'Partially paid';
+  return 'Unpaid';
 }
 
 export default function AdminBookings() {
@@ -191,6 +219,15 @@ export default function AdminBookings() {
   }
 
   function openPaymentForm(booking) {
+    const normalizedStatus = String(booking.status || '').toLowerCase();
+
+    if (
+      ['cancelled', 'no_show'].includes(normalizedStatus) ||
+      getRemainingBalance(booking) <= 0
+    ) {
+      return;
+    }
+
     setPaymentBooking(booking);
     setPaymentAmount('');
     setPaymentMethod('cash');
@@ -222,6 +259,22 @@ export default function AdminBookings() {
       !/^\d+(\.\d{1,2})?$/.test(paymentAmount.trim())
     ) {
       setError('Enter a valid payment amount with no more than two decimal places.');
+      return;
+    }
+
+    const remainingBalance = getRemainingBalance(paymentBooking);
+
+    if (remainingBalance <= 0) {
+      setError('This booking has already been fully paid.');
+      return;
+    }
+
+    if (amount > remainingBalance + 0.001) {
+      setError(
+        `The payment cannot exceed the remaining balance of ${formatAmount(
+          remainingBalance
+        )}.`
+      );
       return;
     }
 
@@ -419,10 +472,12 @@ export default function AdminBookings() {
                   booking.status
                 ).toLowerCase();
 
-                const paymentAllowed = ![
-                  'cancelled',
-                  'no_show',
-                ].includes(normalizedStatus);
+                const totalPaid = getTotalPaid(booking);
+                const remainingBalance = getRemainingBalance(booking);
+                const paymentStatus = getPaymentStatus(booking);
+                const paymentAllowed =
+                  !['cancelled', 'no_show'].includes(normalizedStatus) &&
+                  remainingBalance > 0;
 
                 return (
                   <tr key={booking.booking_id}>
@@ -471,7 +526,20 @@ export default function AdminBookings() {
                     </td>
 
                     <td className="admin-booking-amount">
-                      {formatAmount(booking.amount)}
+                      <div className="admin-booking-payment-breakdown">
+                        <span>
+                          <small>Amount</small>
+                          <strong>{formatAmount(booking.amount)}</strong>
+                        </span>
+                        <span>
+                          <small>Total paid</small>
+                          <strong>{formatAmount(totalPaid)}</strong>
+                        </span>
+                        <span>
+                          <small>Balance</small>
+                          <strong>{formatAmount(remainingBalance)}</strong>
+                        </span>
+                      </div>
                     </td>
 
                     <td>
@@ -513,20 +581,34 @@ export default function AdminBookings() {
                     </td>
 
                     <td>
-                      <button
-                        type="button"
-                        className="admin-payment-button"
-                        disabled={!paymentAllowed}
-                        onClick={() => openPaymentForm(booking)}
-                        title={
-                          paymentAllowed
-                            ? 'Record money received'
-                            : 'Payments are disabled for cancelled or no-show bookings'
-                        }
-                      >
-                        <Banknote size={15} />
-                        Record payment
-                      </button>
+                      <div className="admin-payment-cell">
+                        <span
+                          className={`admin-payment-status-badge ${paymentStatus}`}
+                        >
+                          {formatPaymentStatus(paymentStatus)}
+                        </span>
+
+                        <button
+                          type="button"
+                          className="admin-payment-button"
+                          disabled={!paymentAllowed}
+                          onClick={() => openPaymentForm(booking)}
+                          title={
+                            remainingBalance <= 0
+                              ? 'This booking has been fully paid'
+                              : ['cancelled', 'no_show'].includes(normalizedStatus)
+                                ? 'Payments are disabled for cancelled or no-show bookings'
+                                : `Record payment. Remaining balance: ${formatAmount(
+                                    remainingBalance
+                                  )}`
+                          }
+                        >
+                          <Banknote size={15} />
+                          {remainingBalance <= 0
+                            ? 'Fully paid'
+                            : 'Record payment'}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -575,8 +657,20 @@ export default function AdminBookings() {
             </div>
 
             <div className="admin-payment-booking-total">
-              <span>Booking amount</span>
-              <strong>{formatAmount(paymentBooking.amount)}</strong>
+              <div>
+                <span>Booking amount</span>
+                <strong>{formatAmount(paymentBooking.amount)}</strong>
+              </div>
+              <div>
+                <span>Total paid</span>
+                <strong>{formatAmount(getTotalPaid(paymentBooking))}</strong>
+              </div>
+              <div>
+                <span>Remaining balance</span>
+                <strong>
+                  {formatAmount(getRemainingBalance(paymentBooking))}
+                </strong>
+              </div>
             </div>
 
             {paymentResult && (
@@ -625,8 +719,8 @@ export default function AdminBookings() {
                 onSubmit={handleRecordPayment}
               >
                 <p className="admin-payment-notice">
-                  Record only money that the business has actually
-                  received. Partial payments are supported.
+                  Record only money the business has actually received.
+                  Partial payments are supported. Do not exceed the remaining balance.
                 </p>
 
                 <label>
@@ -635,13 +729,13 @@ export default function AdminBookings() {
                     type="number"
                     min="0.01"
                     step="0.01"
-                    max="999999999"
+                    max={getRemainingBalance(paymentBooking)}
                     required
                     value={paymentAmount}
                     onChange={(event) =>
                       setPaymentAmount(event.target.value)
                     }
-                    placeholder="Enter amount received"
+                    placeholder={`Up to ${getRemainingBalance(paymentBooking).toFixed(2)}`}
                     disabled={submittingPayment}
                   />
                 </label>
