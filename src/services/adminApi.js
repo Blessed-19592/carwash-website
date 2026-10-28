@@ -20,10 +20,10 @@ const error = new Error(
 data.message || 'The request could not be completed.'
 );
 
-```
+
 error.status = response.status;
 throw error;
-```
+
 
 }
 
@@ -76,5 +76,12 @@ return adminRequest(`/admin/bookings/${bookingId}/status`, {
 method: 'PATCH',
 body: JSON.stringify({ status }),
 });
+},
+
+recordPayment(bookingId, paymentDetails) {
+  return adminRequest(`/admin/bookings/${bookingId}/payments`, {
+    method: 'POST',
+    body: JSON.stringify(paymentDetails),
+  });
 },
 };
