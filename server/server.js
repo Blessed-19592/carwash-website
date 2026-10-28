@@ -374,7 +374,8 @@ app.get('/api/admin/bookings', requireAdmin, async (req, res) => {
 });
 
 
-// Update a booking's status (administrator only).
+// Update a booking's status and record its history.
+// Administrator access required.
 app.patch(
   '/api/admin/bookings/:id/status',
   requireAdmin,
@@ -382,23 +383,19 @@ app.patch(
     const bookingId = Number(req.params.id);
     const { status } = req.body;
 
-    // Validate the booking ID.
-    if (
-      !Number.isSafeInteger(bookingId) ||
-      bookingId <= 0
-    ) {
+    if (!Number.isSafeInteger(bookingId) || bookingId <= 0) {
       return res.status(400).json({
         status: 'error',
         message: 'Invalid booking ID.',
       });
     }
 
-    // Only allow recognized booking statuses.
     const allowedStatuses = [
       'pending',
       'confirmed',
       'completed',
       'cancelled',
+      'no_show',
     ];
 
     if (
@@ -412,9 +409,72 @@ app.patch(
     }
 
     const newStatus = status.toLowerCase();
+    let client;
+    let transactionStarted = false;
 
     try {
-      const result = await pool.query(
+      client = await pool.connect();
+
+      await client.query('BEGIN');
+      transactionStarted = true;
+
+      // Lock the booking so concurrent updates cannot overwrite each other.
+      const bookingResult = await client.query(
+        `SELECT booking_id, booking_date, booking_time, status, amount
+         FROM bookings
+         WHERE booking_id = $1
+         FOR UPDATE`,
+        [bookingId]
+      );
+
+      if (bookingResult.rows.length === 0) {
+        await client.query('ROLLBACK');
+        transactionStarted = false;
+
+        return res.status(404).json({
+          status: 'error',
+          message: 'Booking not found.',
+        });
+      }
+
+      const booking = bookingResult.rows[0];
+      const oldStatus = String(booking.status).toLowerCase();
+
+      // Do not allow a no-show status before the appointment time.
+      if (newStatus === 'no_show') {
+        const appointmentResult = await client.query(
+          `SELECT
+             ($1::date + $2::time)
+             <= (CURRENT_TIMESTAMP AT TIME ZONE 'Africa/Nairobi')
+             AS appointment_has_passed`,
+          [booking.booking_date, booking.booking_time]
+        );
+
+        if (!appointmentResult.rows[0].appointment_has_passed) {
+          await client.query('ROLLBACK');
+          transactionStarted = false;
+
+          return res.status(400).json({
+            status: 'error',
+            message: 'A booking cannot be marked as a no-show before its scheduled time.',
+          });
+        }
+      }
+
+      // Avoid unnecessary updates and duplicate history entries.
+      if (oldStatus === newStatus) {
+        await client.query('COMMIT');
+        transactionStarted = false;
+
+        return res.json({
+          status: 'success',
+          message: 'The booking already has this status.',
+          booking,
+        });
+      }
+
+      // Update the booking.
+      const updateResult = await client.query(
         `UPDATE bookings
          SET status = $1
          WHERE booking_id = $2
@@ -427,25 +487,37 @@ app.patch(
         [newStatus, bookingId]
       );
 
-      if (result.rows.length === 0) {
-        return res.status(404).json({
-          status: 'error',
-          message: 'Booking not found.',
-        });
-      }
+      // Record the change in the same transaction.
+      await client.query(
+        `INSERT INTO booking_status_history
+           (booking_id, old_status, new_status)
+         VALUES ($1, $2, $3)`,
+        [bookingId, oldStatus, newStatus]
+      );
+
+      await client.query('COMMIT');
+      transactionStarted = false;
 
       return res.json({
         status: 'success',
         message: 'Booking status updated successfully.',
-        booking: result.rows[0],
+        booking: updateResult.rows[0],
       });
     } catch (error) {
+      if (client && transactionStarted) {
+        await client.query('ROLLBACK').catch(() => {});
+      }
+
       console.error('Error updating booking status:', error.message);
 
       return res.status(500).json({
         status: 'error',
         message: 'Unable to update the booking status.',
       });
+    } finally {
+      if (client) {
+        client.release();
+      }
     }
   }
 );
